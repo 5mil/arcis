@@ -1,16 +1,18 @@
 //! main.zig — Arcis engine entry point
-//! Phase 12 — Refinement & Delivery
+//! Phase 13 — wired to live TCP server
 //! Usage: arcis [--tier forma|figura|visio] [--port 8080]
 
 const std = @import("std");
-const ArcisSession = @import("dashboard/arcis_session.zig").ArcisSession;
+const ArcisSession   = @import("dashboard/arcis_session.zig").ArcisSession;
+const Server         = @import("api/server.zig").Server;
+const ServerConfig   = @import("api/server.zig").ServerConfig;
+const TierDispatcher = @import("api/tier.zig").TierDispatcher;
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    // Parse CLI args.
     const args = try std.process.argsAlloc(allocator);
     defer std.process.argsFree(allocator, args);
 
@@ -19,11 +21,9 @@ pub fn main() !void {
     var i: usize = 1;
     while (i < args.len) : (i += 1) {
         if (std.mem.eql(u8, args[i], "--tier") and i + 1 < args.len) {
-            i += 1;
-            tier = args[i];
+            i += 1; tier = args[i];
         } else if (std.mem.eql(u8, args[i], "--port") and i + 1 < args.len) {
-            i += 1;
-            port = try std.fmt.parseInt(u16, args[i], 10);
+            i += 1; port = try std.fmt.parseInt(u16, args[i], 10);
         }
     }
 
@@ -32,8 +32,9 @@ pub fn main() !void {
     var session = try ArcisSession.init(allocator, tier);
     defer session.deinit();
 
-    std.log.info("ArcisSession ready. Subsystems wired: infer, rag, agents, media, workflow, ontology, library, naming, search, api, dashboard.", .{});
-    std.log.info("API server would listen on 127.0.0.1:{d} — TCP loop stubbed for Phase 12 integration.", .{port});
+    var dispatcher = TierDispatcher.init(allocator, &session, tier);
+    var srv = Server.init(allocator, &dispatcher, .{ .port = port });
 
-    // TODO: wire session.tier router to server.zig TCP accept loop.
+    std.log.info("Routes: /health /infer /rag /search /name /workflow/run /term/propose /term/validate", .{});
+    try srv.serve();
 }

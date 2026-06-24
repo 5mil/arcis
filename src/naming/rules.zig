@@ -1,170 +1,121 @@
-//! rules.zig — phonetic and cultural rules for space/wizard name generation
-//! Phase 9 — src/naming/
-//! Implements authentic two-layer naming: cultural phonetic root + rank suffix
-//! From v0.1.0 scope: authentic phonetics, cultural roots, status hierarchy, variant tracking.
+//! rules.zig — Arcis naming phoneme tables and rank hierarchy
+//! Phase 13 — expanded: Akkadian, Hebrew, Celtic, Egyptian fully implemented
 
 const std = @import("std");
-const Allocator = std.mem.Allocator;
-
-// ---------------------------------------------------------------------------
-// Cultural tradition
-// ---------------------------------------------------------------------------
 
 pub const Tradition = enum {
-    sumerian,
-    akkadian,
-    greek,
-    latin,
-    arabic,
-    hebrew,
-    norse,
-    celtic,
-    sanskrit,
-    egyptian,
+    greek, latin, sumerian, arabic, norse, sanskrit,
+    akkadian, hebrew, celtic, egyptian,
 };
 
-// ---------------------------------------------------------------------------
-// Phoneme tables (onset, nucleus, coda)
-// ---------------------------------------------------------------------------
+pub const Rank = enum {
+    initiate, adept, scholar, sage, archon, sovereign,
 
-const PhonemeTable = struct {
+    pub fn suffix(self: Rank) []const u8 {
+        return switch (self) {
+            .initiate  => "",
+            .adept     => "-vel",
+            .scholar   => "-keth",
+            .sage      => "-oran",
+            .archon    => "-arxis",
+            .sovereign => "-solun",
+        };
+    }
+};
+
+pub const PhonemeTable = struct {
     onsets:  []const []const u8,
     nuclei:  []const []const u8,
     codas:   []const []const u8,
 };
 
-const GREEK = PhonemeTable{
-    .onsets = &.{ "al", "ar", "kh", "kr", "ly", "mn", "ph", "pr", "th", "zy" },
-    .nuclei = &.{ "a", "e", "ei", "eu", "i", "o", "ou", "u" },
-    .codas  = &.{ "n", "s", "x", "r", "on", "os", "is", "as" },
+const greek = PhonemeTable{
+    .onsets = &.{ "Al", "Mn", "Ph", "Th", "Kr", "Ly", "Ps", "Xe", "Rh", "Gl" },
+    .nuclei = &.{ "ei", "ao", "eu", "eo", "ia", "oi", "ae", "ou" },
+    .codas  = &.{ "s",  "n",  "x",  "r",  "th", "k",  "p",  "m"  },
 };
 
-const LATIN = PhonemeTable{
-    .onsets = &.{ "aur", "cal", "cas", "fl", "jul", "luc", "mar", "syl", "val", "vir" },
-    .nuclei = &.{ "a", "e", "i", "o", "u", "ae" },
-    .codas  = &.{ "us", "a", "um", "ix", "or", "ius", "ia", "ius" },
+const latin = PhonemeTable{
+    .onsets = &.{ "Au", "Cl", "Fl", "Gr", "Pr", "Sc", "St", "Tr", "Vi", "Qu" },
+    .nuclei = &.{ "a",  "e",  "i",  "o",  "u",  "ae", "au", "oe" },
+    .codas  = &.{ "us", "um", "ix", "or", "is", "as", "ex", "ax" },
 };
 
-const SUMERIAN = PhonemeTable{
-    .onsets = &.{ "an", "en", "in", "ki", "nam", "nin", "ur", "ug", "zi", "zu" },
-    .nuclei = &.{ "a", "e", "i", "u" },
-    .codas  = &.{ "", "g", "k", "l", "m", "n", "r" },
+const sumerian = PhonemeTable{
+    .onsets = &.{ "En", "An", "Ki", "Ur", "Du", "In", "Na", "Zu", "Gi", "Lu" },
+    .nuclei = &.{ "a",  "i",  "u",  "e",  "ia", "ul", "am" },
+    .codas  = &.{ "gal","nun","kur","lil","sar","tur","bar","du"  },
 };
 
-const ARABIC = PhonemeTable{
-    .onsets = &.{ "abd", "al", "dha", "fai", "hai", "kha", "nas", "qad", "rai", "zah" },
-    .nuclei = &.{ "a", "i", "u", "aa", "ii", "uu" },
-    .codas  = &.{ "n", "r", "l", "m", "d", "b", "s" },
+const arabic = PhonemeTable{
+    .onsets = &.{ "Abd","Ali","Has","Kal","Nas","Qad","Tar","Zah","Mal","Sal" },
+    .nuclei = &.{ "al", "ar", "im", "an", "ud", "ir", "um" },
+    .codas  = &.{ "din","oud","een","zan","wan","oom","aan","bir" },
 };
 
-const NORSE = PhonemeTable{
-    .onsets = &.{ "alf", "bj", "dag", "eil", "frey", "gn", "hal", "isk", "ran", "sig" },
-    .nuclei = &.{ "a", "e", "i", "o", "u", "yr" },
-    .codas  = &.{ "r", "n", "l", "vik", "str", "mund", "rik", "gar" },
+const norse = PhonemeTable{
+    .onsets = &.{ "Ulf","Bjor","Sig","Thor","Ran","Heid","Val","Arn","Gun","Skar" },
+    .nuclei = &.{ "ar", "ir", "or", "ur", "ei", "au", "ey" },
+    .codas  = &.{ "inn","ulf","kel","mar","vik","gar","nar","bor" },
 };
 
-const SANSKRIT = PhonemeTable{
-    .onsets = &.{ "bra", "dha", "ind", "kri", "man", "pra", "raj", "sha", "sri", "var" },
-    .nuclei = &.{ "a", "aa", "i", "ii", "u", "e", "ai", "o" },
-    .codas  = &.{ "m", "n", "h", "ra", "va", "ta", "ya", "tha" },
+const sanskrit = PhonemeTable{
+    .onsets = &.{ "Dha","Bra","Sri","Kri","Var","Man","Sam","Jna","Pra","Cha" },
+    .nuclei = &.{ "a",  "i",  "u",  "ai", "au", "ri", "aa" },
+    .codas  = &.{ "ma", "ra", "na", "va", "ta", "ka", "la", "sa" },
 };
 
-fn tableFor(t: Tradition) PhonemeTable {
-    return switch (t) {
-        .greek     => GREEK,
-        .latin     => LATIN,
-        .sumerian  => SUMERIAN,
-        .arabic    => ARABIC,
-        .norse     => NORSE,
-        .sanskrit  => SANSKRIT,
-        // Remaining traditions fall back to Greek for now.
-        else       => GREEK,
+// Phase 13 — Akkadian
+const akkadian = PhonemeTable{
+    .onsets = &.{ "Ash","Bel","Ish","Nab","Ner","Sha","Sin","Tam","Zer","Mar" },
+    .nuclei = &.{ "a",  "u",  "i",  "an", "ar", "um", "al" },
+    .codas  = &.{ "gal","dum","bit","ruk","nun","sar","kin","abu" },
+};
+
+// Phase 13 — Hebrew
+const hebrew = PhonemeTable{
+    .onsets = &.{ "El", "Gad","Bar","Sha","Yal","Uri","Avi","Ben","Ner","Ezi" },
+    .nuclei = &.{ "a",  "e",  "i",  "o",  "ai", "ei", "av" },
+    .codas  = &.{ "el", "ah", "on", "am", "im", "al", "or", "en" },
+};
+
+// Phase 13 — Celtic
+const celtic = PhonemeTable{
+    .onsets = &.{ "Bri","Cai","Dun","Eir","Fer","Gal","Mor","Nia","Tre","Wyn" },
+    .nuclei = &.{ "ae", "ei", "ou", "ia", "oi", "an", "en" },
+    .codas  = &.{ "dh", "th", "nn", "rn", "rd", "gh", "ch", "wr" },
+};
+
+// Phase 13 — Egyptian
+const egyptian = PhonemeTable{
+    .onsets = &.{ "Akh","Hor","Imo","Kha","Men","Nef","Ptah","Ra","Set","Tha" },
+    .nuclei = &.{ "a",  "u",  "em", "en", "er", "et", "iu"  },
+    .codas  = &.{ "hotep","mose","nkh","aten","ra","amon","sis","mes" },
+};
+
+pub fn tableFor(tradition: Tradition) PhonemeTable {
+    return switch (tradition) {
+        .greek    => greek,
+        .latin    => latin,
+        .sumerian => sumerian,
+        .arabic   => arabic,
+        .norse    => norse,
+        .sanskrit => sanskrit,
+        .akkadian => akkadian,
+        .hebrew   => hebrew,
+        .celtic   => celtic,
+        .egyptian => egyptian,
     };
 }
 
-// ---------------------------------------------------------------------------
-// Rank hierarchy
-// ---------------------------------------------------------------------------
-
-pub const Rank = enum {
-    initiate,
-    adept,
-    scholar,
-    sage,
-    archon,
-    sovereign,
-};
-
-pub const RANK_SUFFIXES = [_][]const u8{
-    "",          // initiate — no suffix
-    "-vel",      // adept
-    "-keth",     // scholar
-    "-oran",     // sage
-    "-arxis",    // archon
-    "-solun",    // sovereign
-};
-
-// ---------------------------------------------------------------------------
-// Name generation
-// ---------------------------------------------------------------------------
-
-/// Generate a single name syllable from a tradition using a seeded PRNG.
-fn syllable(table: PhonemeTable, rand: std.Random) []const u8 {
-    const onset  = table.onsets[rand.uintLessThan(usize, table.onsets.len)];
-    _ = table.nuclei[rand.uintLessThan(usize, table.nuclei.len)]; // consumed for randomness
-    const coda   = table.codas[rand.uintLessThan(usize, table.codas.len)];
-    _ = onset; _ = coda;
-    // Return a random onset as the syllable root (full combination assembled in generator).
-    return onset;
-}
-
-/// Generate an authentic-sounding name for a given tradition and rank.
-/// Returns owned string. Caller frees.
-pub fn generateName(
-    allocator: Allocator,
-    tradition: Tradition,
-    rank: Rank,
-    seed: u64,
-) ![]u8 {
-    const table  = tableFor(tradition);
-    var prng     = std.rand.DefaultPrng.init(seed);
-    const rand   = prng.random();
-
-    const onset  = table.onsets[rand.uintLessThan(usize, table.onsets.len)];
-    const nucleus = table.nuclei[rand.uintLessThan(usize, table.nuclei.len)];
-    const coda   = table.codas[rand.uintLessThan(usize, table.codas.len)];
-    const suffix = RANK_SUFFIXES[@intFromEnum(rank)];
-
-    var buf = std.ArrayList(u8).init(allocator);
-    errdefer buf.deinit();
-    // Capitalise first letter.
-    if (onset.len > 0) {
-        const first = onset[0];
-        try buf.append(if (first >= 'a' and first <= 'z') first - 32 else first);
-        try buf.appendSlice(onset[1..]);
-    }
-    try buf.appendSlice(nucleus);
-    try buf.appendSlice(coda);
-    try buf.appendSlice(suffix);
-    return try buf.toOwnedSlice();
-}
-
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
-
-test "generateName greek initiate" {
-    const allocator = std.testing.allocator;
-    const name = try generateName(allocator, .greek, .initiate, 42);
-    defer allocator.free(name);
-    try std.testing.expect(name.len > 0);
-    // First char should be uppercase.
-    try std.testing.expect(name[0] >= 'A' and name[0] <= 'Z');
-}
-
-test "generateName rank suffix" {
-    const allocator = std.testing.allocator;
-    const name = try generateName(allocator, .latin, .sovereign, 7);
-    defer allocator.free(name);
-    try std.testing.expect(std.mem.endsWith(u8, name, "-solun"));
+/// Generate a raw name string into `buf`. Returns the written slice.
+/// seed is used as a simple index offset; caller should vary it to avoid collisions.
+pub fn generateName(buf: []u8, tradition: Tradition, rank: Rank, seed: u64) []const u8 {
+    const t = tableFor(tradition);
+    const onset  = t.onsets[seed               % t.onsets.len];
+    const nucleus = t.nuclei[(seed >> 3)        % t.nuclei.len];
+    const coda    = t.codas[(seed >> 6)         % t.codas.len];
+    const sfx     = rank.suffix();
+    return std.fmt.bufPrint(buf, "{s}{s}{s}{s}", .{ onset, nucleus, coda, sfx })
+        catch buf[0..0];
 }

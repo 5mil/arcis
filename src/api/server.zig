@@ -1,150 +1,127 @@
-//! server.zig — HTTP/WebSocket server: route table, request/response types, listener loop
-//! Phase 11 — src/api/
-//! Mirrors: src/workflow/workflow_session.zig (unified session dispatch)
+//! server.zig — Arcis HTTP server
+//! Phase 13 — Live TCP accept loop wired to TierDispatcher
+//! Listens on 127.0.0.1:<port>, reads HTTP/1.1 request line, dispatches to handler.
 
 const std = @import("std");
-const Allocator = std.mem.Allocator;
+const Allocator     = std.mem.Allocator;
+const net           = std.net;
+const TierDispatcher = @import("tier.zig").TierDispatcher;
+const handlers      = @import("handlers.zig");
 
-// ---------------------------------------------------------------------------
-// HTTP method and status
-// ---------------------------------------------------------------------------
-
-pub const Method = enum { GET, POST, PUT, DELETE, PATCH };
-
-pub const Status = enum(u16) {
-    ok           = 200,
-    created      = 201,
-    bad_request  = 400,
-    not_found    = 404,
-    internal_err = 500,
+pub const ServerConfig = struct {
+    host: []const u8 = "127.0.0.1",
+    port: u16        = 8080,
+    backlog: u31     = 128,
 };
 
-// ---------------------------------------------------------------------------
-// Request / Response
-// ---------------------------------------------------------------------------
+pub const Method = enum { GET, POST, DELETE, UNKNOWN };
 
 pub const Request = struct {
     method:  Method,
     path:    []const u8,
-    headers: std.StringHashMap([]const u8),
     body:    []const u8,
     allocator: Allocator,
 
     pub fn deinit(self: *Request) void {
-        self.headers.deinit();
+        self.allocator.free(self.body);
     }
 };
 
 pub const Response = struct {
-    status:  Status,
-    body:    []const u8,   // owned by handler
-    headers: std.StringHashMap([]const u8),
+    status:  u16          = 200,
+    body:    []const u8   = "",
     allocator: Allocator,
-
-    pub fn init(allocator: Allocator, status: Status, body: []const u8) !Response {
-        var headers = std.StringHashMap([]const u8).init(allocator);
-        try headers.put("Content-Type", "application/json");
-        return Response{ .status = status, .body = body, .headers = headers, .allocator = allocator };
-    }
 
     pub fn deinit(self: *Response) void {
-        self.headers.deinit();
+        if (self.body.len > 0) self.allocator.free(self.body);
     }
-};
-
-// ---------------------------------------------------------------------------
-// Route handler type
-// ---------------------------------------------------------------------------
-
-pub const HandlerFn = *const fn (req: *Request, allocator: Allocator) anyerror!Response;
-
-pub const Route = struct {
-    method:  Method,
-    path:    []const u8,   // exact match for now; prefix/regex in Phase 12
-    handler: HandlerFn,
-};
-
-// ---------------------------------------------------------------------------
-// Router
-// ---------------------------------------------------------------------------
-
-pub const Router = struct {
-    routes:    std.ArrayList(Route),
-    allocator: Allocator,
-
-    pub fn init(allocator: Allocator) Router {
-        return .{ .routes = std.ArrayList(Route).init(allocator), .allocator = allocator };
-    }
-
-    pub fn deinit(self: *Router) void {
-        self.routes.deinit();
-    }
-
-    pub fn add(self: *Router, route: Route) !void {
-        try self.routes.append(route);
-    }
-
-    pub fn dispatch(self: *Router, req: *Request) !Response {
-        for (self.routes.items) |r| {
-            if (r.method == req.method and std.mem.eql(u8, r.path, req.path)) {
-                return try r.handler(req, req.allocator);
-            }
-        }
-        return try Response.init(req.allocator, .not_found, "{\"error\":\"not found\"}");
-    }
-};
-
-// ---------------------------------------------------------------------------
-// Server (TCP listener stub)
-// ---------------------------------------------------------------------------
-
-pub const ServerConfig = struct {
-    host:    []const u8 = "127.0.0.1",
-    port:    u16        = 8080,
-    threads: usize      = 4,
 };
 
 pub const Server = struct {
-    config:    ServerConfig,
-    router:    Router,
-    allocator: Allocator,
+    config:     ServerConfig,
+    dispatcher: *TierDispatcher,
+    allocator:  Allocator,
 
-    pub fn init(allocator: Allocator, config: ServerConfig) Server {
-        return .{
-            .config    = config,
-            .router    = Router.init(allocator),
-            .allocator = allocator,
-        };
+    pub fn init(allocator: Allocator, dispatcher: *TierDispatcher, config: ServerConfig) Server {
+        return .{ .config = config, .dispatcher = dispatcher, .allocator = allocator };
     }
 
-    pub fn deinit(self: *Server) void {
-        self.router.deinit();
-    }
+    /// Blocking accept loop. Call from main after ArcisSession.init.
+    pub fn serve(self: *Server) !void {
+        const addr = try net.Address.parseIp4(self.config.host, self.config.port);
+        var listener = try addr.listen(.{ .reuse_address = true, .kernel_backlog = self.config.backlog });
+        defer listener.deinit();
 
-    /// Start listening. Blocks until stop() is called.
-    /// TODO: std.net.StreamServer accept loop + thread pool dispatch.
-    pub fn listen(self: *Server) !void {
-        std.log.info("Arcis API listening on {s}:{d}", .{ self.config.host, self.config.port });
-        // TODO: open TCP socket, accept connections, parse HTTP/1.1, dispatch to router.
-        _ = self;
+        std.log.info("Arcis listening on {s}:{d}", .{ self.config.host, self.config.port });
+
+        while (true) {
+            const conn = try listener.accept();
+            // Spawn a detached thread per connection.
+            const ctx = try self.allocator.create(ConnContext);
+            ctx.* = .{ .conn = conn, .server = self };
+            const t = try std.Thread.spawn(.{}, handleConn, .{ctx});
+            t.detach();
+        }
     }
 };
 
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
+const ConnContext = struct {
+    conn:   net.Server.Connection,
+    server: *Server,
+};
 
-test "Router dispatch not_found" {
-    const allocator = std.testing.allocator;
-    var router = Router.init(allocator);
-    defer router.deinit();
-    var headers = std.StringHashMap([]const u8).init(allocator);
-    defer headers.deinit();
-    var req = Request{
-        .method = .GET, .path = "/missing",
-        .headers = headers, .body = "", .allocator = allocator,
+fn handleConn(ctx: *ConnContext) void {
+    defer ctx.server.allocator.destroy(ctx);
+    defer ctx.conn.stream.close();
+    serveConn(ctx) catch |err| {
+        std.log.err("connection error: {}", .{err});
     };
-    var resp = try router.dispatch(&req);
+}
+
+fn serveConn(ctx: *ConnContext) !void {
+    const allocator = ctx.server.allocator;
+    var buf: [4096]u8 = undefined;
+    const n = try ctx.conn.stream.read(&buf);
+    if (n == 0) return;
+    const raw = buf[0..n];
+
+    // Parse request line: "METHOD /path HTTP/1.1\r\n"
+    var lines = std.mem.splitSequence(u8, raw, "\r\n");
+    const request_line = lines.next() orelse return;
+    var parts = std.mem.splitScalar(u8, request_line, ' ');
+    const method_str = parts.next() orelse "";
+    const path        = parts.next() orelse "/";
+
+    const method: Method = if (std.mem.eql(u8, method_str, "GET")) .GET
+        else if (std.mem.eql(u8, method_str, "POST")) .POST
+        else if (std.mem.eql(u8, method_str, "DELETE")) .DELETE
+        else .UNKNOWN;
+
+    // Extract body (after double CRLF).
+    const body = if (std.mem.indexOf(u8, raw, "\r\n\r\n")) |idx|
+        try allocator.dupe(u8, raw[idx + 4 ..])
+    else
+        try allocator.dupe(u8, "");
+
+    var req = Request{ .method = method, .path = path, .body = body, .allocator = allocator };
+    defer req.deinit();
+
+    var resp = try ctx.server.dispatcher.dispatch(allocator, &req);
     defer resp.deinit();
-    try std.testing.expectEqual(Status.not_found, resp.status);
+
+    // Write HTTP/1.1 response.
+    const status_text: []const u8 = switch (resp.status) {
+        200 => "OK",
+        400 => "Bad Request",
+        404 => "Not Found",
+        405 => "Method Not Allowed",
+        else => "Internal Server Error",
+    };
+    const header = try std.fmt.allocPrint(allocator,
+        "HTTP/1.1 {d} {s}\r\nContent-Type: application/json\r\nContent-Length: {d}\r\nConnection: close\r\n\r\n",
+        .{ resp.status, status_text, resp.body.len },
+    );
+    defer allocator.free(header);
+    try ctx.conn.stream.writeAll(header);
+    try ctx.conn.stream.writeAll(resp.body);
 }

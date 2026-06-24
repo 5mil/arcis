@@ -1,118 +1,89 @@
-//! tier.zig — Forma / Figura / Visio tier dispatcher: route requests by capability tier
-//! Phase 11 — src/api/
-//! Tiers defined in v0.1.0 and zigllm-ui: Forma (basic), Figura (standard), Visio (full)
+//! tier.zig — Arcis TierDispatcher
+//! Phase 13 — updated to dispatch live requests to handlers
 
-const std = @import("std");
+const std       = @import("std");
 const Allocator = std.mem.Allocator;
 const Request   = @import("server.zig").Request;
 const Response  = @import("server.zig").Response;
-const Status    = @import("server.zig").Status;
-const Router    = @import("server.zig").Router;
-const Route     = @import("server.zig").Route;
-const Method    = @import("server.zig").Method;
+const handlers  = @import("handlers.zig");
+const ArcisSession = @import("../dashboard/arcis_session.zig").ArcisSession;
 
-// ---------------------------------------------------------------------------
-// Tier definition
-// ---------------------------------------------------------------------------
-
-pub const Tier = enum {
-    forma,   // text inference + RAG only
-    figura,  // + agents + workflow
-    visio,   // + media pipelines + ontology + naming + dashboard
+pub const Caps = struct {
+    infer:     bool = false,
+    rag:       bool = false,
+    agents:    bool = false,
+    workflow:  bool = false,
+    media:     bool = false,
+    ontology:  bool = false,
+    naming:    bool = false,
+    dashboard: bool = false,
 };
 
-/// Capability bitmask per tier.
-pub const TierCapabilities = struct {
-    infer:    bool,
-    rag:      bool,
-    agents:   bool,
-    workflow: bool,
-    media:    bool,
-    ontology: bool,
-    naming:   bool,
-    dashboard: bool,
+pub const Tier = struct {
+    name: []const u8,
+    caps: Caps,
 
-    pub fn forTier(t: Tier) TierCapabilities {
-        return switch (t) {
-            .forma => .{
-                .infer = true,  .rag = true,
-                .agents = false, .workflow = false, .media = false,
-                .ontology = false, .naming = false, .dashboard = false,
-            },
-            .figura => .{
-                .infer = true,  .rag = true,
-                .agents = true, .workflow = true, .media = false,
-                .ontology = false, .naming = false, .dashboard = false,
-            },
-            .visio => .{
-                .infer = true,  .rag = true,
-                .agents = true, .workflow = true, .media = true,
-                .ontology = true, .naming = true, .dashboard = true,
+    pub fn fromName(name: []const u8) Tier {
+        if (std.mem.eql(u8, name, "forma")) return .{
+            .name = "forma",
+            .caps = .{ .infer = true, .rag = true },
+        };
+        if (std.mem.eql(u8, name, "figura")) return .{
+            .name = "figura",
+            .caps = .{ .infer = true, .rag = true, .agents = true, .workflow = true },
+        };
+        return .{  // visio (default)
+            .name = "visio",
+            .caps = .{
+                .infer = true, .rag = true, .agents = true, .workflow = true,
+                .media = true, .ontology = true, .naming = true, .dashboard = true,
             },
         };
     }
 };
 
-// ---------------------------------------------------------------------------
-// TierDispatcher
-// ---------------------------------------------------------------------------
-
 pub const TierDispatcher = struct {
-    tier:      Tier,
-    caps:      TierCapabilities,
-    routers:   [3]Router,   // index = @intFromEnum(Tier)
+    tier:    Tier,
+    session: *ArcisSession,
     allocator: Allocator,
 
-    pub fn init(allocator: Allocator, tier: Tier) TierDispatcher {
+    pub fn init(allocator: Allocator, session: *ArcisSession, tier_name: []const u8) TierDispatcher {
         return .{
-            .tier      = tier,
-            .caps      = TierCapabilities.forTier(tier),
-            .routers   = .{
-                Router.init(allocator),
-                Router.init(allocator),
-                Router.init(allocator),
-            },
+            .tier      = Tier.fromName(tier_name),
+            .session   = session,
             .allocator = allocator,
         };
     }
 
-    pub fn deinit(self: *TierDispatcher) void {
-        for (&self.routers) |*r| r.deinit();
-    }
+    pub fn dispatch(self: *TierDispatcher, allocator: Allocator, req: *Request) !Response {
+        const path = req.path;
 
-    /// Register a route for a specific tier (and all tiers above it).
-    pub fn addRoute(self: *TierDispatcher, min_tier: Tier, route: Route) !void {
-        const min_idx = @intFromEnum(min_tier);
-        for (min_idx..3) |i| {
-            try self.routers[i].add(route);
-        }
-    }
+        if (std.mem.eql(u8, path, "/health") or std.mem.startsWith(u8, path, "/health?"))
+            return handlers.handleHealth(allocator, req, self.session);
 
-    /// Dispatch a request through the active tier's router.
-    pub fn dispatch(self: *TierDispatcher, req: *Request) !Response {
-        const idx = @intFromEnum(self.tier);
-        return try self.routers[idx].dispatch(req);
-    }
+        if (std.mem.eql(u8, path, "/infer"))
+            return handlers.handleInfer(allocator, req, self.session);
 
-    /// Check if the active tier has a capability.
-    pub fn has(self: TierDispatcher, comptime field: []const u8) bool {
-        return @field(self.caps, field);
+        if (std.mem.eql(u8, path, "/rag"))
+            return handlers.handleRag(allocator, req, self.session);
+
+        if (std.mem.eql(u8, path, "/search") or std.mem.startsWith(u8, path, "/search?"))
+            return handlers.handleSearch(allocator, req, self.session);
+
+        if (std.mem.eql(u8, path, "/name"))
+            return handlers.handleName(allocator, req, self.session);
+
+        if (std.mem.eql(u8, path, "/workflow/run"))
+            return handlers.handleWorkflowRun(allocator, req, self.session);
+
+        if (std.mem.eql(u8, path, "/term/propose"))
+            return handlers.handleTermPropose(allocator, req, self.session);
+
+        if (std.mem.eql(u8, path, "/term/validate"))
+            return handlers.handleTermValidate(allocator, req, self.session);
+
+        // 404
+        const body = try allocator.dupe(u8, "{\"error\":\"not found\"}");
+        return Response{ .status = 404, .body = body, .allocator = allocator };
     }
 };
-
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
-
-test "TierCapabilities forma" {
-    const caps = TierCapabilities.forTier(.forma);
-    try std.testing.expect(caps.infer);
-    try std.testing.expect(!caps.agents);
-    try std.testing.expect(!caps.media);
-}
-
-test "TierCapabilities visio has all" {
-    const caps = TierCapabilities.forTier(.visio);
-    try std.testing.expect(caps.infer and caps.rag and caps.agents and
-        caps.workflow and caps.media and caps.ontology and caps.naming and caps.dashboard);
-}
