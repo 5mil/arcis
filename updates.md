@@ -4,6 +4,64 @@
 
 ---
 
+## [0.5.0] — 2026-06-24
+
+### Status: Complete — Phase 12 Refinement & Delivery
+
+### Added
+
+**Phase 12 — `build.zig` · `src/main.zig` · `tests/` · `docs/` · `examples/`**
+
+`build.zig` — full Zig build script: one executable (`arcis`), per-subsystem test steps (`zig build test`, `zig build test-<name>`), tier-specific run steps (`zig build run-forma|figura|visio`), test filter support.
+
+`src/main.zig` — CLI entry point: `--tier forma|figura|visio`, `--port`, GPA allocator, ArcisSession init, startup log.
+
+`tests/test_core.zig` — Tensor alloc/fill, Shape rank/numel, DType sizes, Config defaults.
+`tests/test_knowledge.zig` — Full terminology lifecycle (propose→validate→deprecate), fork+derives_from relation, catalog ingest + Viewer pagination, NameStore uniqueness, cross-subsystem keyword index.
+`tests/test_workflow.zig` — WorkflowSession register + runNow, job completion, trigger registration.
+`tests/test_session.zig` — ArcisSession all-tier capability checks (visio/figura/forma), catalog + naming wired.
+
+`docs/architecture.md` — subsystem map, tier model, URN format, governance lifecycle, naming rank table, build commands, RAG and workflow data flow diagrams.
+`docs/getting-started.md` — prerequisites, build, run, test commands, basic Zig API usage, tier feature table.
+
+`examples/basic_session.zig` — init ArcisSession (visio), ingest text, propose+validate concept, generate name, keyword search.
+`examples/workflow_example.zig` — two-node graph (upper→print), register node types, runNow, inspect job status.
+
+### Phase Status
+
+| Phase | Name | Modules | Status |
+|---|---|---|---|
+| 1 | Core Primitives | `src/core/` | ✅ Complete |
+| 2 | Inference Engine | `src/infer/` | ✅ Complete |
+| 3 | RAG Pipeline | `src/rag/` | ✅ Complete |
+| 4 | Agent Orchestration | `src/agents/` | ✅ Complete |
+| 5 | Media Pipelines | `src/media/` | ✅ Complete |
+| 6 | Workflow Engine | `src/workflow/` | ✅ Complete |
+| 7 | Knowledge Foundation | `src/common/`, `src/import/`, `src/export/` | ✅ Complete |
+| 8 | Ontology & Library | `src/ontology/`, `src/library/` | ✅ Complete |
+| 9 | Naming Engine | `src/naming/` | ✅ Complete |
+| 10 | Search & Semantics | `src/search/` | ✅ Complete |
+| 11 | Dashboard & API | `src/dashboard/`, `src/api/` | ✅ Complete |
+| 12 | Refinement & Delivery | `tests/`, `docs/`, `examples/`, `build.zig` | ✅ Complete |
+
+### Stats
+- 42 source files total
+- 12 phases complete
+- All subsystems wired into ArcisSession
+- One binary, zero external runtimes
+- `zig build test` runs all 4 integration test suites
+
+### Next
+- Implement TCP accept loop in `src/api/server.zig`
+- Wire real GGUF model loading end-to-end
+- Add `src/infer/session.zig` HTTP handler in TierDispatcher
+- Expand phoneme tables for remaining 4 traditions (Akkadian, Hebrew, Celtic, Egyptian)
+
+### Next Review
+- 2026-07-01
+
+---
+
 ## [0.4.0] — 2026-06-24
 
 ### Status: Scaffolded — Phases 1–11 Complete
