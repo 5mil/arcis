@@ -4,6 +4,87 @@
 
 ---
 
+## [0.3.0] — 2026-06-24
+
+### Status: Planning — Phase 5
+
+### Phase 5 — `src/media/` Spec
+
+#### Build Order (bottom-up)
+
+```
+audio.zig           ← raw PCM I/O, WAV reader, sample rate conversion
+mel.zig             ← STFT → power spectrum → mel filterbank → log-mel
+whisper.zig         ← Whisper encoder+decoder, GGUF weight loading, beam search
+bark_tokenizer.zig  ← Bark text → semantic token encoding (EnCodec vocab)
+bark.zig            ← semantic → coarse → fine acoustic token prediction
+encodec.zig         ← EnCodec neural audio codec, token → waveform decode
+diffusion.zig       ← DDPM/DDIM scheduler, UNet denoising loop, latent decode
+media_session.zig   ← unified entry point: ASR, TTS, image-gen dispatch
+```
+
+#### Key Data Flows
+
+```
+ASR: WAV file → audio.zig → mel.zig → whisper.zig → []const u8 transcript
+TTS: []const u8 text → bark_tokenizer.zig → bark.zig → encodec.zig → PCM f32
+IMG: []const u8 prompt → whisper encoder (CLIP-style) → diffusion.zig → []u8 pixels
+```
+
+#### Dependencies on Existing Subsystems
+- `src/core/tensor.zig` — all intermediate buffers use the existing Tensor type
+- `src/infer/gguf.zig` + `loader.zig` — Whisper and Bark weights load via GGUF mmap
+- `src/infer/attention.zig` + `transformer.zig` — reused by Whisper encoder/decoder and Bark stages
+- `src/infer/sampler.zig` — Bark autoregressive token sampling reuses temperature/top-k/top-p
+- `src/infer/bpe.zig` + `vocab.zig` — bark_tokenizer.zig extends BPE, does not replace it
+
+#### Completion Criteria
+- [ ] `audio.zig` — WAV round-trip test (read → normalize → write)
+- [ ] `mel.zig` — mel output matches reference (80-bin, 16 kHz, 25 ms window)
+- [ ] `whisper.zig` — transcribes `tiny.en` GGUF on a 10-second sample
+- [ ] `bark_tokenizer.zig` — encodes a short sentence to semantic tokens
+- [ ] `bark.zig` — generates coarse acoustic tokens end-to-end
+- [ ] `encodec.zig` — decodes tokens to a playable WAV
+- [ ] `diffusion.zig` — produces a 512×512 pixel buffer from a prompt
+- [ ] `media_session.zig` — all three dispatch paths exercised in a single test
+
+### Unified Phase Plan (as of 2026-06-24)
+
+| Phase | Name | Modules | Status |
+|---|---|---|---|
+| 1 | Core Primitives | `src/core/` | Complete |
+| 2 | Inference Engine | `src/infer/` | Complete |
+| 3 | RAG Pipeline | `src/rag/` | Complete |
+| 4 | Agent Orchestration | `src/agents/` | Complete |
+| 5 | Media Pipelines | `src/media/` | Next |
+| 6 | Workflow Engine | `src/workflow/` | Queued |
+| 7 | Knowledge Foundation | `src/common/`, `src/import/`, `src/export/` | Queued |
+| 8 | Ontology & Library | `src/ontology/`, `src/library/` | Queued |
+| 9 | Naming Engine | `src/naming/` | Queued |
+| 10 | Search & Semantics | `src/search/` | Queued |
+| 11 | Dashboard & API | `src/dashboard/`, `src/api/` | Queued |
+| 12 | Refinement & Delivery | `tests/`, `docs/`, `examples/` | Queued |
+
+### Next Review
+- 2026-07-01
+
+---
+
+## [0.2.0] — 2026-06-24
+
+### Status: Complete — Phases 1–4
+
+### Added
+- Completed `src/core/`: tensor, dtype, shape, config
+- Completed `src/infer/`: gguf, loader, model, vocab, bpe, tokenizer, rope, kvcache, attention, transformer, sampler, session
+- Completed `src/rag/`: chunker, embedder, index, retriever, pipeline
+- Completed `src/agents/`: tool, planner, orchestrator
+
+### Next Review
+- 2026-07-01
+
+---
+
 ## [0.1.0] — 2026-06-24
 
 ### Status: Planning
