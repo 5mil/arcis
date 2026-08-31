@@ -1,6 +1,6 @@
 //! server.zig — Arcis HTTP server
 //! Phase 13 — Live TCP accept loop wired to TierDispatcher
-//! Listens on 127.0.0.1:<port>, reads HTTP/1.1 request line, dispatches to handler.
+//! Listens on 0.0.0.0:<port> (all interfaces) for local + cloud/Docker.
 
 const std = @import("std");
 const Allocator     = std.mem.Allocator;
@@ -9,7 +9,7 @@ const TierDispatcher = @import("tier.zig").TierDispatcher;
 const handlers      = @import("handlers.zig");
 
 pub const ServerConfig = struct {
-    host: []const u8 = "127.0.0.1",
+    host: []const u8 = "0.0.0.0",
     port: u16        = 8080,
     backlog: u31     = 128,
 };
@@ -113,12 +113,14 @@ fn serveConn(ctx: *ConnContext) !void {
     const status_text: []const u8 = switch (resp.status) {
         200 => "OK",
         400 => "Bad Request",
+        403 => "Forbidden",
         404 => "Not Found",
         405 => "Method Not Allowed",
+        503 => "Service Unavailable",
         else => "Internal Server Error",
     };
     const header = try std.fmt.allocPrint(allocator,
-        "HTTP/1.1 {d} {s}\r\nContent-Type: application/json\r\nContent-Length: {d}\r\nConnection: close\r\n\r\n",
+        "HTTP/1.1 {d} {s}\r\nContent-Type: application/json\r\nContent-Length: {d}\r\nConnection: close\r\nAccess-Control-Allow-Origin: *\r\n\r\n",
         .{ resp.status, status_text, resp.body.len },
     );
     defer allocator.free(header);
