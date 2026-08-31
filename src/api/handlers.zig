@@ -1,6 +1,5 @@
 //! handlers.zig — Arcis route handler functions
-//! Phase 13 — /infer, /rag, /search, /name, /workflow, /term, /health
-//! Each handler receives a *Request and *ArcisSession, returns Response.
+//! Phase 13+ — /infer now calls real GGUF generation when a model is loaded
 
 const std       = @import("std");
 const Allocator = std.mem.Allocator;
@@ -12,8 +11,10 @@ const ArcisSession = @import("../dashboard/arcis_session.zig").ArcisSession;
 // Health
 // ---------------------------------------------------------------------------
 
-pub fn handleHealth(allocator: Allocator, _: *Request, _: *ArcisSession) !Response {
-    const body = try allocator.dupe(u8, "{\"status\":\"ok\"}");
+pub fn handleHealth(allocator: Allocator, _: *Request, session: *ArcisSession) !Response {
+    const loaded = if (session.infer.loaded) "true" else "false";
+    const body = try std.fmt.allocPrint(allocator,
+        "{{\"status\":\"ok\",\"model_loaded\":{s}}}", .{loaded});
     return Response{ .status = 200, .body = body, .allocator = allocator };
 }
 
@@ -24,13 +25,44 @@ pub fn handleHealth(allocator: Allocator, _: *Request, _: *ArcisSession) !Respon
 
 pub fn handleInfer(allocator: Allocator, req: *Request, session: *ArcisSession) !Response {
     if (!session.tier.caps.infer) return forbidden(allocator);
-    // Parse prompt from JSON body (minimal scan).
+
     const prompt = jsonGetString(req.body, "prompt") orelse
         return badRequest(allocator, "missing prompt");
-    _ = prompt;
-    // Session.generate is stubbed — returns placeholder until real GGUF weights loaded.
+
+    // Optional max_tokens (default 128)
+    var max_tokens: usize = 128;
+    if (jsonGetString(req.body, "max_tokens")) |s| {
+        max_tokens = std.fmt.parseInt(usize, s, 10) catch 128;
+    }
+
+    if (!session.infer.loaded) {
+        const out = try allocator.dupe(u8,
+            "{\"error\":\"no model loaded — start with --model path/to/model.gguf\"}");
+        return Response{ .status = 503, .body = out, .allocator = allocator };
+    }
+
+    const result = session.infer.generate(prompt, max_tokens) catch |err| {
+        const msg = try std.fmt.allocPrint(allocator, "{{\"error\":\"generation failed: {}\"}}", .{err});
+        return Response{ .status = 500, .body = msg, .allocator = allocator };
+    };
+    defer allocator.free(result);
+
+    // Escape for JSON
+    var escaped = std.ArrayList(u8).init(allocator);
+    defer escaped.deinit();
+    for (result) |c| {
+        switch (c) {
+            '"' => try escaped.appendSlice("\\\""),
+            '\\' => try escaped.appendSlice("\\\\"),
+            '\n' => try escaped.appendSlice("\\n"),
+            '\r' => try escaped.appendSlice("\\r"),
+            '\t' => try escaped.appendSlice("\\t"),
+            else => try escaped.append(c),
+        }
+    }
+
     const out = try std.fmt.allocPrint(allocator,
-        "{{\"result\":\"[inference stub: session.generate not yet wired to weight file]\"}}", .{});
+        "{{\"result\":\"{s}\"}}", .{escaped.items});
     return Response{ .status = 200, .body = out, .allocator = allocator };
 }
 
