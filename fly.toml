@@ -1,0 +1,50 @@
+# Arcis on Fly.io
+#
+# First time:
+#   fly launch --name arcis --no-deploy   # or use existing app name
+#   fly volumes create arcis_data --size 10 --region iad
+#   fly volumes create arcis_models --size 20 --region iad   # optional, for GGUF
+#   fly deploy
+#
+# With a model:
+#   fly ssh console
+#   # upload model to /models, then set:
+#   fly secrets set ARCIS_MODEL=/models/your-model.gguf
+#   # or change the process command below
+
+app = "arcis"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "8080"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ["app"]
+
+  [[http_service.checks]]
+    interval = "15s"
+    timeout = "5s"
+    grace_period = "30s"
+    method = "GET"
+    path = "/health"
+
+[[vm]]
+  size = "shared-cpu-2x"
+  memory = "2048mb"
+
+# Uncomment when you create the volumes:
+# [[mounts]]
+#   source = "arcis_data"
+#   destination = "/app/arcis-projects"
+#
+# [[mounts]]
+#   source = "arcis_models"
+#   destination = "/models"
