@@ -1,6 +1,5 @@
 //! arcis_session.zig — top-level engine session: wires all subsystems into one handle
-//! Phase 11 — src/dashboard/
-//! This is the single root object created by main.zig and handed to the API server.
+//! Phase 11+ — now includes optional InferenceEngine for real GGUF generation
 
 const std = @import("std");
 const Allocator = std.mem.Allocator;
@@ -17,6 +16,7 @@ const WorkflowSession = @import("../workflow/workflow_session.zig").WorkflowSess
 const TierDispatcher = @import("../api/tier.zig").TierDispatcher;
 const Tier          = @import("../api/tier.zig").Tier;
 const ViewBuilder   = @import("views.zig").ViewBuilder;
+const InferenceEngine = @import("../infer/engine.zig").InferenceEngine;
 
 // ---------------------------------------------------------------------------
 // ArcisSession
@@ -32,6 +32,7 @@ pub const ArcisSession = struct {
     workflow:   WorkflowSession,
     tier:       TierDispatcher,
     views:      ViewBuilder,
+    infer:      InferenceEngine,
     allocator:  Allocator,
 
     /// Initialise the full engine. tier_name: "forma" | "figura" | "visio".
@@ -49,6 +50,7 @@ pub const ArcisSession = struct {
         var workflow = WorkflowSession.init(allocator);
         var tier_d   = TierDispatcher.init(allocator, tier);
         var views    = ViewBuilder.init(allocator);
+        var infer    = InferenceEngine.initEmpty(allocator);
 
         return ArcisSession{
             .seq      = seq,
@@ -60,11 +62,18 @@ pub const ArcisSession = struct {
             .workflow = workflow,
             .tier     = tier_d,
             .views    = views,
+            .infer    = infer,
             .allocator = allocator,
         };
     }
 
+    /// Load a GGUF model for inference. Optional — engine works without it.
+    pub fn loadModel(self: *ArcisSession, path: []const u8) !void {
+        try self.infer.load(path);
+    }
+
     pub fn deinit(self: *ArcisSession) void {
+        self.infer.deinit();
         self.concepts.deinit();
         self.catalog.deinit();
         self.names.deinit();
@@ -85,6 +94,7 @@ test "ArcisSession init visio" {
     try std.testing.expectEqual(Tier.visio, session.tier.tier);
     try std.testing.expect(session.tier.caps.media);
     try std.testing.expect(session.tier.caps.naming);
+    try std.testing.expect(!session.infer.loaded);
 }
 
 test "ArcisSession init forma" {
