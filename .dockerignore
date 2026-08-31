@@ -1,0 +1,13 @@
+zig-out/
+.zig-cache/
+arcis-projects/
+models/
+*.gguf
+.git/
+.gitignore
+*.md
+!README.md
+docs/
+examples/
+heroes_feast/
+tests/
