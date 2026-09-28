@@ -1,5 +1,4 @@
 //! main.zig — Arcis engine entry point
-//! Phase 13+ — wired to live TCP server + optional GGUF model loading
 //! Usage: arcis [--tier forma|figura|visio] [--port 8080] [--model path/to/model.gguf]
 
 const std = @import("std");
@@ -7,6 +6,8 @@ const ArcisSession   = @import("dashboard/arcis_session.zig").ArcisSession;
 const Server         = @import("api/server.zig").Server;
 const ServerConfig   = @import("api/server.zig").ServerConfig;
 const TierDispatcher = @import("api/tier.zig").TierDispatcher;
+
+const HOUSE_GGUF = "models/gguf/DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M.gguf";
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -17,7 +18,7 @@ pub fn main() !void {
     defer std.process.argsFree(allocator, args);
 
     var tier: []const u8 = "visio";
-    var port: u16 = 8080;
+    var port: u16 = 9090;
     var model_path: ?[]const u8 = null;
     var i: usize = 1;
     while (i < args.len) : (i += 1) {
@@ -30,6 +31,12 @@ pub fn main() !void {
         }
     }
 
+    if (model_path == null) {
+        if (std.fs.cwd().access(HOUSE_GGUF, .{})) {
+            model_path = HOUSE_GGUF;
+        } else |_| {}
+    }
+
     std.log.info("Arcis starting — tier: {s}  port: {d}", .{ tier, port });
 
     var session = try ArcisSession.init(allocator, tier);
@@ -39,15 +46,14 @@ pub fn main() !void {
         std.log.info("loading model: {s}", .{path});
         session.loadModel(path) catch |err| {
             std.log.err("failed to load model: {}", .{err});
-            std.log.err("continuing without inference (only F16/F32 GGUF supported for now)", .{});
         };
     } else {
-        std.log.info("no --model given; /infer will return 503 until a model is loaded", .{});
+        std.log.info("no model; run tools/pull_gguf.sh then restart", .{});
     }
 
     var dispatcher = TierDispatcher.init(allocator, &session, tier);
     var srv = Server.init(allocator, &dispatcher, .{ .port = port });
 
-    std.log.info("Routes: /health /infer /rag /search /name /workflow/run /term/propose /term/validate", .{});
+    std.log.info("Routes: / /health /infer /rag /search", .{});
     try srv.serve();
 }
