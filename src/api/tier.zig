@@ -6,6 +6,7 @@ const Response  = @import("server.zig").Response;
 const handlers  = @import("handlers.zig");
 const root_page = @import("root_page.zig");
 const rag_scan  = @import("rag_scan.zig");
+const health_ex = @import("health_ex.zig");
 const ArcisSession = @import("../dashboard/arcis_session.zig").ArcisSession;
 
 pub const Caps = struct {
@@ -35,7 +36,7 @@ pub const TierDispatcher = struct {
         if (std.mem.eql(u8, path, "/") or std.mem.eql(u8, path, "/index.html"))
             return root_page.handleRoot(allocator, req, self.session);
         if (std.mem.eql(u8, path, "/health") or std.mem.startsWith(u8, path, "/health?"))
-            return handlers.handleHealth(allocator, req, self.session);
+            return health_ex.run(allocator, req, self.session);
         if (std.mem.eql(u8, path, "/infer")) return handlers.handleInfer(allocator, req, self.session);
         if (std.mem.eql(u8, path, "/rag")) return rag_scan.run(allocator, req, self.session);
         if (std.mem.eql(u8, path, "/search") or std.mem.startsWith(u8, path, "/search?"))
