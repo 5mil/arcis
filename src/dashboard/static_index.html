@@ -1,19 +1,50 @@
-<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Arcis</title>
-<style>body{font-family:sans-serif;background:#070b14;color:#e2e8f0;margin:2rem}a{color:#38bdf8}pre{background:#0b1220;padding:1rem;border-radius:8px;white-space:pre-wrap}</style></head>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>House library</title>
+<style>
+body{font-family:system-ui,sans-serif;background:#070b14;color:#e2e8f0;margin:0}
+main{max-width:40rem;margin:0 auto;padding:2rem 1.25rem}
+a{color:#38bdf8;text-decoration:none}
+h1{font-size:1.75rem;margin:0 0 .25rem}
+.sub{color:#94a3b8;margin:0 0 1.5rem}
+label{display:block;font-size:.8rem;color:#94a3b8;margin-bottom:.35rem}
+input{width:100%;box-sizing:border-box;padding:.7rem .8rem;border-radius:.7rem;border:1px solid #1e293b;background:#0b1220;color:#fff}
+button{margin-top:.6rem;padding:.65rem 1rem;border:0;border-radius:.7rem;background:#0ea5e9;color:#082f49;font-weight:600;cursor:pointer}
+pre, .card{background:#0b1220;border:1px solid #1e293b;border-radius:.9rem;padding:1rem;white-space:pre-wrap;font-size:.9rem}
+.row{display:flex;gap:.75rem;margin:1rem 0 1.5rem;font-size:.85rem;color:#94a3b8}
+</style></head>
 <body>
-<p>Arcis · <a href="http://192.168.50.143:8787/">MagiMDM desk</a></p>
-<h1>Library / infer</h1>
-<p>Health: <span id="h">…</span></p>
-<p>Library: <span id="lib">…</span></p>
-<pre id="out">no infer yet</pre>
-<form id="f"><input id="q" size="50" placeholder="prompt"/><button>Infer</button></form>
+<main>
+  <p class="sub"><a href="http://192.168.50.143:8787/">← House desk</a></p>
+  <h1>Ask the library</h1>
+  <p class="sub">Answers stay on this computer. Books listed below if you copied them.</p>
+  <div class="row">
+    <span>Box: <strong id="h">checking…</strong></span>
+  </div>
+  <form id="f">
+    <label for="q">Your question</label>
+    <input id="q" autocomplete="off" placeholder="e.g. What is a slope?"/>
+    <button type="submit">Ask</button>
+  </form>
+  <h2 style="font-size:1rem;margin:2rem 0 .5rem">Answer</h2>
+  <pre id="out">Type a question and press Ask.</pre>
+  <h2 style="font-size:1rem;margin:2rem 0 .5rem">Books on this box</h2>
+  <div class="card" id="lib">Looking for textbooks…</div>
+</main>
 <script>
-fetch('/health').then(r=>r.json()).then(j=>{document.getElementById('h').textContent=JSON.stringify(j)}).catch(()=>{document.getElementById('h').textContent='down'});
-fetch('/rag',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({query:'algebra'})})
-  .then(r=>r.text()).then(t=>{document.getElementById('lib').textContent=t}).catch(()=>{document.getElementById('lib').textContent='rag down'});
+fetch('/health').then(r=>r.json()).then(j=>{
+  document.getElementById('h').textContent = j.model_loaded ? 'ready' : 'no book-brain loaded yet';
+}).catch(()=>{document.getElementById('h').textContent='not running'});
+fetch('/rag',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({query:'book'})})
+  .then(r=>r.text()).then(t=>{document.getElementById('lib').textContent=t})
+  .catch(()=>{document.getElementById('lib').textContent='No books folder yet. On tank: ./tools/link_library.sh'});
 document.getElementById('f').onsubmit=async e=>{
- e.preventDefault();
- const r=await fetch('/infer',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:document.getElementById('q').value,max_tokens:'64'})});
- document.getElementById('out').textContent=await r.text();
+  e.preventDefault();
+  const q=document.getElementById('q').value.trim();
+  if(!q) return;
+  document.getElementById('out').textContent='Thinking…';
+  const r=await fetch('/infer',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:q,max_tokens:'96'})});
+  document.getElementById('out').textContent=await r.text();
 };
-</script></body></html>
+</script>
+</body></html>
