@@ -3,7 +3,6 @@ const gguf = @import("gguf.zig");
 const Model = @import("model.zig").Model;
 const ModelMeta = @import("model.zig").ModelMeta;
 
-/// Memory-mapped view of the GGUF tensor data section.
 pub const MappedFile = struct {
     data: []align(std.mem.page_size) const u8,
     handle: std.fs.File,
@@ -28,7 +27,6 @@ pub const MappedFile = struct {
         self.handle.close();
     }
 
-    /// Return a raw byte slice for a tensor given its offset and byte length.
     pub fn tensorBytes(
         self: *const MappedFile,
         offset: u64,
@@ -38,39 +36,30 @@ pub const MappedFile = struct {
     }
 };
 
-/// Load and validate a GGUF model file.
-/// Returns a Model with parsed header, index, and open mmap.
-/// Caller must call model.deinit().
+fn firstU32(parsed: *const gguf.GGUFFile, keys: []const []const u8) ?u32 {
+    for (keys) |k| {
+        if (gguf.metaU32(parsed, k)) |v| return v;
+    }
+    return null;
+}
+
 pub fn loadModel(
     allocator: std.mem.Allocator,
     path: []const u8,
 ) !Model {
-    // Parse header via buffered read.
     const file = try std.fs.cwd().openFile(path, .{});
     defer file.close();
     var parsed = try gguf.parse(allocator, file);
     errdefer parsed.deinit();
 
-    // Extract required architectural metadata.
     const arch = gguf.metaString(&parsed, "general.architecture") orelse
         return error.MissingArchitecture;
 
-    const n_layers = gguf.metaU32(&parsed, "llama.block_count") orelse
-        gguf.metaU32(&parsed, "mistral.block_count") orelse
-        gguf.metaU32(&parsed, "phi.block_count") orelse
+    const n_layers = firstU32(&parsed, &.{ "llama.block_count", "mistral.block_count", "phi.block_count", "qwen2.block_count", "qwen.block_count" }) orelse
         return error.MissingLayerCount;
-
-    const n_ctx = gguf.metaU32(&parsed, "llama.context_length") orelse
-        gguf.metaU32(&parsed, "mistral.context_length") orelse
-        0;
-
-    const n_embd = gguf.metaU32(&parsed, "llama.embedding_length") orelse
-        gguf.metaU32(&parsed, "mistral.embedding_length") orelse
-        0;
-
-    const n_heads = gguf.metaU32(&parsed, "llama.attention.head_count") orelse
-        gguf.metaU32(&parsed, "mistral.attention.head_count") orelse
-        0;
+    const n_ctx = firstU32(&parsed, &.{ "llama.context_length", "mistral.context_length", "qwen2.context_length", "qwen.context_length" }) orelse 0;
+    const n_embd = firstU32(&parsed, &.{ "llama.embedding_length", "mistral.embedding_length", "qwen2.embedding_length", "qwen.embedding_length" }) orelse 0;
+    const n_heads = firstU32(&parsed, &.{ "llama.attention.head_count", "mistral.attention.head_count", "qwen2.attention.head_count", "qwen.attention.head_count" }) orelse 0;
 
     const meta = ModelMeta{
         .architecture = arch,
@@ -81,9 +70,7 @@ pub fn loadModel(
         .tensor_count = @intCast(parsed.tensors.len),
     };
 
-    // Open mmap for tensor data access.
     const mapped = try MappedFile.open(path);
-
     return Model{
         .gguf      = parsed,
         .mapped    = mapped,
