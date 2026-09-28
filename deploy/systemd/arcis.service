@@ -1,0 +1,18 @@
+[Unit]
+Description=Arcis house library
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=fivemil
+Group=fivemil
+WorkingDirectory=/home/fivemil/arcis
+ExecStart=/home/fivemil/arcis/zig-out/bin/arcis --tier forma --port 9090
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
