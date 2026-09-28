@@ -6,5 +6,5 @@ const index_html = @embedFile("../dashboard/static_index.html");
 
 pub fn handleRoot(allocator: Allocator, _: *Request, _: *ArcisSession) !Response {
     const body = try allocator.dupe(u8, index_html);
-    return Response{ .status = 200, .body = body, .allocator = allocator, .content_type = "text/html" };
+    return Response{ .status = 200, .body = body, .allocator = allocator };
 }
