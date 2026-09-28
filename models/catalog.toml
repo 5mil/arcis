@@ -1,0 +1,21 @@
+# Weights live in models/gguf/ (gitignored). Apache-2.0 distillate of DeepSeek-R1.
+# Official base: https://huggingface.co/deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B
+# GGUF (bartowski Q4_K_M): ~1.12 GB — default for this box.
+
+[[model]]
+id = "r1-1.5b-q4"
+kind = "chat"
+arch = "qwen2"
+ram_gb = 3
+file = "gguf/DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M.gguf"
+url = "https://huggingface.co/bartowski/DeepSeek-R1-Distill-Qwen-1.5B-GGUF/resolve/main/DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M.gguf"
+note = "Skip-ahead student. Zig Session only loads F16/F32 today — use llama.cpp sidecar for Q4."
+
+[[model]]
+id = "llama32-1b-q4"
+kind = "chat"
+arch = "llama"
+ram_gb = 2
+file = "gguf/Llama-3.2-1B-Instruct-Q4_K_M.gguf"
+url = "https://huggingface.co/bartowski/Llama-3.2-1B-Instruct-GGUF/resolve/main/Llama-3.2-1B-Instruct-Q4_K_M.gguf"
+note = "Matches getting-started.md name."
