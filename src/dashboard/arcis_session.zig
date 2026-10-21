@@ -41,16 +41,16 @@ pub const ArcisSession = struct {
             else if (std.mem.eql(u8, tier_name, "figura")) .figura
             else .visio;
 
-        var seq      = IdSequence.init();
-        var concepts = ConceptStore.init(allocator, &seq);
-        var terms    = TermDir.init(allocator, &concepts);
-        var catalog  = Catalog.init(allocator, &seq);
-        var names    = NameStore.init(allocator, &seq);
-        var search   = UnifiedSearch.init(allocator);
-        var workflow = WorkflowSession.init(allocator);
-        var tier_d   = TierDispatcher.init(allocator, tier);
-        var views    = ViewBuilder.init(allocator);
-        var infer    = InferenceEngine.initEmpty(allocator);
+        const seq      = IdSequence.init();
+        const concepts = ConceptStore.init(allocator, &seq);
+        const terms    = TermDir.init(allocator, &concepts);
+        const catalog  = Catalog.init(allocator, &seq);
+        const names    = NameStore.init(allocator, &seq);
+        const search   = UnifiedSearch.init(allocator);
+        const workflow = WorkflowSession.init(allocator);
+        const tier_d   = TierDispatcher.init(allocator, tier);
+        const views    = ViewBuilder.init(allocator);
+        const infer    = InferenceEngine.initEmpty(allocator);
 
         return ArcisSession{
             .seq      = seq,
