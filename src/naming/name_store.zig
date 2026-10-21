@@ -105,6 +105,13 @@ pub const NameStore = struct {
         return self.name_index.get(value);
     }
 
+    pub fn getById(self: *NameStore, id: EntityId) ?*NameRecord {
+        for (self.names.items) |*rec| {
+            if (rec.id == id) return rec;
+        }
+        return null;
+    }
+
     pub fn count(self: NameStore) usize { return self.names.items.len; }
 };
 
