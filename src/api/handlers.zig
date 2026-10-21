@@ -144,7 +144,7 @@ pub fn handleWorkflowRun(allocator: Allocator, req: *Request, session: *ArcisSes
     if (!session.tier.tier.caps.workflow) return forbidden(allocator);
     const wf_id_str = jsonGetString(req.body, "workflow_id") orelse
         return badRequest(allocator, "missing workflow_id");
-    const wf_id = std.fmt.parseInt(u64, wf_id_str, 10) catch
+    const wf_id = std.fmt.parseInt(u32, wf_id_str, 10) catch
         return badRequest(allocator, "invalid workflow_id");
     const text = jsonGetString(req.body, "payload") orelse "";
     const Payload = @import("../workflow/node.zig").Payload;
