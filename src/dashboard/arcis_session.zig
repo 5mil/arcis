@@ -37,10 +37,6 @@ pub const ArcisSession = struct {
 
     /// Initialise the full engine. tier_name: "forma" | "figura" | "visio".
     pub fn init(allocator: Allocator, tier_name: []const u8) !ArcisSession {
-        const tier: Tier = if (std.mem.eql(u8, tier_name, "forma")) .forma
-            else if (std.mem.eql(u8, tier_name, "figura")) .figura
-            else .visio;
-
         const seq      = IdSequence.init();
         const concepts = ConceptStore.init(allocator, &seq);
         const terms    = TermDir.init(allocator, &concepts);
@@ -48,7 +44,7 @@ pub const ArcisSession = struct {
         const names    = NameStore.init(allocator, &seq);
         const search   = UnifiedSearch.init(allocator);
         const workflow = WorkflowSession.init(allocator);
-        const tier_d   = TierDispatcher.init(allocator, tier);
+        const tier_d   = TierDispatcher.init(allocator, null, tier_name); // session filled later if needed
         const views    = ViewBuilder.init(allocator);
         const infer    = InferenceEngine.initEmpty(allocator);
 
@@ -91,9 +87,9 @@ test "ArcisSession init visio" {
     const allocator = std.testing.allocator;
     var session = try ArcisSession.init(allocator, "visio");
     defer session.deinit();
-    try std.testing.expectEqual(Tier.visio, session.tier.tier);
-    try std.testing.expect(session.tier.caps.media);
-    try std.testing.expect(session.tier.caps.naming);
+    try std.testing.expectEqualStrings("visio", session.tier.tier.name);
+    try std.testing.expect(session.tier.tier.caps.media);
+    try std.testing.expect(session.tier.tier.caps.naming);
     try std.testing.expect(!session.infer.loaded);
 }
 
@@ -101,6 +97,6 @@ test "ArcisSession init forma" {
     const allocator = std.testing.allocator;
     var session = try ArcisSession.init(allocator, "forma");
     defer session.deinit();
-    try std.testing.expectEqual(Tier.forma, session.tier.tier);
-    try std.testing.expect(!session.tier.caps.media);
+    try std.testing.expectEqualStrings("forma", session.tier.tier.name);
+    try std.testing.expect(!session.tier.tier.caps.media);
 }
