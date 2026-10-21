@@ -36,14 +36,14 @@ pub const ArcisSession = struct {
 
     /// Initialise the full engine. tier_name: "forma" | "figura" | "visio".
     pub fn init(allocator: Allocator, tier_name: []const u8) !ArcisSession {
-        const seq      = IdSequence.init();
+        var seq        = IdSequence.init();
         const concepts = ConceptStore.init(allocator, &seq);
         const terms    = TermDir.init(allocator, &concepts);
         const catalog  = Catalog.init(allocator, &seq);
         const names    = NameStore.init(allocator, &seq);
         const search   = UnifiedSearch.init(allocator);
         const workflow = WorkflowSession.init(allocator);
-        var tier_d     = TierDispatcher.init(allocator, null, tier_name);
+        const tier_d   = TierDispatcher.init(allocator, null, tier_name);
         const views    = ViewBuilder.init(allocator);
         const infer    = InferenceEngine.initEmpty(allocator);
 
