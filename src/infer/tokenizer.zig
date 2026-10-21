@@ -75,26 +75,7 @@ pub const Tokenizer = struct {
         self: *Tokenizer,
         parsed: *const gguf.GGUFFile,
     ) !void {
-        // GGUF stores the vocab as individual meta entries:
-        // tokenizer.ggml.tokens is an array-type entry.
-        // We iterate all meta entries and collect tokens in order.
-        var token_list = std.ArrayList([]const u8).init(self.allocator);
-        defer token_list.deinit();
-
-        for (parsed.meta) |e| {
-            if (std.mem.eql(u8, e.key, "tokenizer.ggml.tokens")) {
-                // value_bytes for array type starts with type(u32)+count(u64).
-                // Individual tokens were discarded during parse; we reconstruct
-                // from the raw bytes by re-reading if available.
-                // In practice, vocab is loaded via direct entry iteration below.
-                _ = e;
-            }
-        }
-
-        // Load tokens: each entry keyed as "tokenizer.ggml.tokens" contains
-        // the full array. Since our parser stores raw prefix bytes for arrays,
-        // we load tokens by iterating entries whose keys start with the token prefix.
-        // For GGUF v3, individual tokens appear as meta entries in sequence.
+        // Load tokens and merges by iterating meta entries.
         var rank: u32 = 0;
         for (parsed.meta) |e| {
             if (std.mem.startsWith(u8, e.key, "tokenizer.ggml.token_type")) continue;
