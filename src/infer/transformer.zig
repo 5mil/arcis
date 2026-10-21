@@ -56,18 +56,18 @@ fn ffnForward(
     const E = cfg.embed_dim;
     const F = cfg.ffn_dim;
 
-    var xb = try allocator.alloc(f32, E);
+    const xb = try allocator.alloc(f32, E);
     defer allocator.free(xb);
     @memcpy(xb, x);
     attention.rmsNorm(xb, w.rms_ffn, 1e-5);
 
-    var gate_out = try allocator.alloc(f32, F);
+    const gate_out = try allocator.alloc(f32, F);
     defer allocator.free(gate_out);
-    var up_out   = try allocator.alloc(f32, F);
+    const up_out   = try allocator.alloc(f32, F);
     defer allocator.free(up_out);
-    var hidden   = try allocator.alloc(f32, F);
+    const hidden   = try allocator.alloc(f32, F);
     defer allocator.free(hidden);
-    var down_out = try allocator.alloc(f32, E);
+    const down_out = try allocator.alloc(f32, E);
     defer allocator.free(down_out);
 
     attention.matVec(gate_out, w.w_gate, xb, F, E);
@@ -122,7 +122,7 @@ pub fn forward(
     const E = cfg.embed_dim;
 
     // Token embedding lookup.
-    var x = try allocator.alloc(f32, E);
+    const x = try allocator.alloc(f32, E);
     errdefer allocator.free(x);
     const emb_base = token_id * E;
     @memcpy(x, weights.embed_table[emb_base .. emb_base + E]);
@@ -140,7 +140,7 @@ pub fn forward(
     attention.rmsNorm(x, weights.rms_final, 1e-5);
 
     // LM head projection → logits.
-    var logits = try allocator.alloc(f32, cfg.vocab_size);
+    const logits = try allocator.alloc(f32, cfg.vocab_size);
     errdefer allocator.free(logits);
     attention.matVec(logits, weights.lm_head, x, cfg.vocab_size, E);
 
