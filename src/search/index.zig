@@ -8,7 +8,7 @@ const Allocator  = std.mem.Allocator;
 const EntityId   = @import("../common/id.zig").EntityId;
 const Embedder   = @import("../rag/embedder.zig").Embedder;
 const VectorIndex = @import("../rag/index.zig").VectorIndex;
-const ScoredDoc  = @import("../rag/index.zig").ScoredDoc;
+const ScoredDoc  = @import("../rag/index.zig").SearchResult;
 
 // ---------------------------------------------------------------------------
 // SearchResult
@@ -73,7 +73,7 @@ pub const UnifiedSearchIndex = struct {
     pub fn init(allocator: Allocator) UnifiedSearchIndex {
         return .{
             .keyword  = KeywordIndex.init(allocator),
-            .vectors  = VectorIndex.init(allocator),
+            .vectors  = VectorIndex.init(allocator, 384), // default embedding dim
             .allocator = allocator,
         };
     }
@@ -91,7 +91,8 @@ pub const UnifiedSearchIndex = struct {
         embedding: []const f32,
     ) !void {
         try self.keyword.indexDocument(entity_id, text);
-        try self.vectors.add(@intCast(entity_id), embedding);
+        try self.vectors.add("doc", 0, embedding);
+        _ = entity_id;
     }
 
     /// Keyword search. Returns matching entity IDs.
@@ -106,13 +107,13 @@ pub const UnifiedSearchIndex = struct {
         }
     }
 
-    /// Semantic vector search. Returns top-k ScoredDocs.
+    /// Semantic vector search. Returns top-k results.
     pub fn searchSemantic(
         self: *UnifiedSearchIndex,
         query_embedding: []const f32,
         top_k: usize,
     ) ![]ScoredDoc {
-        return try self.vectors.topK(self.allocator, query_embedding, top_k);
+        return try self.vectors.search(query_embedding, top_k);
     }
 };
 
