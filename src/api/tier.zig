@@ -26,25 +26,29 @@ pub const Tier = struct {
 
 pub const TierDispatcher = struct {
     tier: Tier,
-    session: *ArcisSession,
+    session: ?*ArcisSession = null,
     allocator: Allocator,
-    pub fn init(allocator: Allocator, session: *ArcisSession, tier_name: []const u8) TierDispatcher {
+    pub fn init(allocator: Allocator, session: ?*ArcisSession, tier_name: []const u8) TierDispatcher {
         return .{ .tier = Tier.fromName(tier_name), .session = session, .allocator = allocator };
+    }
+    pub fn setSession(self: *TierDispatcher, session: *ArcisSession) void {
+        self.session = session;
     }
     pub fn dispatch(self: *TierDispatcher, allocator: Allocator, req: *Request) !Response {
         const path = req.path;
+        const session = self.session orelse return error.NoSession;
         if (std.mem.eql(u8, path, "/") or std.mem.eql(u8, path, "/index.html"))
-            return root_page.handleRoot(allocator, req, self.session);
+            return root_page.handleRoot(allocator, req, session);
         if (std.mem.eql(u8, path, "/health") or std.mem.startsWith(u8, path, "/health?"))
-            return health_ex.run(allocator, req, self.session);
-        if (std.mem.eql(u8, path, "/infer")) return handlers.handleInfer(allocator, req, self.session);
-        if (std.mem.eql(u8, path, "/rag")) return rag_scan.run(allocator, req, self.session);
+            return health_ex.run(allocator, req, session);
+        if (std.mem.eql(u8, path, "/infer")) return handlers.handleInfer(allocator, req, session);
+        if (std.mem.eql(u8, path, "/rag")) return rag_scan.run(allocator, req, session);
         if (std.mem.eql(u8, path, "/search") or std.mem.startsWith(u8, path, "/search?"))
-            return handlers.handleSearch(allocator, req, self.session);
-        if (std.mem.eql(u8, path, "/name")) return handlers.handleName(allocator, req, self.session);
-        if (std.mem.eql(u8, path, "/workflow/run")) return handlers.handleWorkflowRun(allocator, req, self.session);
-        if (std.mem.eql(u8, path, "/term/propose")) return handlers.handleTermPropose(allocator, req, self.session);
-        if (std.mem.eql(u8, path, "/term/validate")) return handlers.handleTermValidate(allocator, req, self.session);
+            return handlers.handleSearch(allocator, req, session);
+        if (std.mem.eql(u8, path, "/name")) return handlers.handleName(allocator, req, session);
+        if (std.mem.eql(u8, path, "/workflow/run")) return handlers.handleWorkflowRun(allocator, req, session);
+        if (std.mem.eql(u8, path, "/term/propose")) return handlers.handleTermPropose(allocator, req, session);
+        if (std.mem.eql(u8, path, "/term/validate")) return handlers.handleTermValidate(allocator, req, session);
         const body = try allocator.dupe(u8, "{\"error\":\"not found\"}");
         return Response{ .status = 404, .body = body, .allocator = allocator };
     }
