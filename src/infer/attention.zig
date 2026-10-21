@@ -101,17 +101,17 @@ pub fn forward(
     const gqa_ratio = H / KH; // heads per kv group
 
     // Allocate working buffers.
-    var xb  = try allocator.alloc(f32, E);
+    const xb  = try allocator.alloc(f32, E);
     defer allocator.free(xb);
-    var q   = try allocator.alloc(f32, H  * D);
+    const q   = try allocator.alloc(f32, H  * D);
     defer allocator.free(q);
-    var k   = try allocator.alloc(f32, KH * D);
+    const k   = try allocator.alloc(f32, KH * D);
     defer allocator.free(k);
-    var v   = try allocator.alloc(f32, KH * D);
+    const v   = try allocator.alloc(f32, KH * D);
     defer allocator.free(v);
-    var att = try allocator.alloc(f32, pos + 1);
+    const att = try allocator.alloc(f32, pos + 1);
     defer allocator.free(att);
-    var xout = try allocator.alloc(f32, E);
+    const xout = try allocator.alloc(f32, E);
     defer allocator.free(xout);
 
     // RMSNorm on input.
@@ -158,7 +158,7 @@ pub fn forward(
     }
 
     // Output projection: xout -> x (residual added).
-    var proj = try allocator.alloc(f32, E);
+    const proj = try allocator.alloc(f32, E);
     defer allocator.free(proj);
     matVec(proj, wo, xout, E, H * D);
     for (x, proj) |*xi, p| xi.* += p;
