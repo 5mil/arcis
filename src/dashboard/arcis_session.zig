@@ -14,7 +14,6 @@ const NameStore     = @import("../naming/name_store.zig").NameStore;
 const UnifiedSearch = @import("../search/index.zig").UnifiedSearchIndex;
 const WorkflowSession = @import("../workflow/workflow_session.zig").WorkflowSession;
 const TierDispatcher = @import("../api/tier.zig").TierDispatcher;
-const Tier          = @import("../api/tier.zig").Tier;
 const ViewBuilder   = @import("views.zig").ViewBuilder;
 const InferenceEngine = @import("../infer/engine.zig").InferenceEngine;
 
@@ -44,11 +43,11 @@ pub const ArcisSession = struct {
         const names    = NameStore.init(allocator, &seq);
         const search   = UnifiedSearch.init(allocator);
         const workflow = WorkflowSession.init(allocator);
-        const tier_d   = TierDispatcher.init(allocator, null, tier_name); // session filled later if needed
+        var tier_d     = TierDispatcher.init(allocator, null, tier_name);
         const views    = ViewBuilder.init(allocator);
         const infer    = InferenceEngine.initEmpty(allocator);
 
-        return ArcisSession{
+        var session = ArcisSession{
             .seq      = seq,
             .concepts = concepts,
             .terms    = terms,
@@ -61,6 +60,8 @@ pub const ArcisSession = struct {
             .infer    = infer,
             .allocator = allocator,
         };
+        session.tier.setSession(&session);
+        return session;
     }
 
     /// Load a GGUF model for inference. Optional — engine works without it.
