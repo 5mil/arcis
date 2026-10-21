@@ -4,7 +4,7 @@ const Model = @import("model.zig").Model;
 const ModelMeta = @import("model.zig").ModelMeta;
 
 pub const MappedFile = struct {
-    data: []align(std.mem.page_size) const u8,
+    data: []align(std.heap.page_size_min) const u8,
     handle: std.fs.File,
 
     pub fn open(path: []const u8) !MappedFile {
