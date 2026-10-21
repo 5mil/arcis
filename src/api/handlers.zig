@@ -24,7 +24,7 @@ pub fn handleHealth(allocator: Allocator, _: *Request, session: *ArcisSession) !
 // POST /infer   body: {"prompt": "...", "max_tokens": 128}
 
 pub fn handleInfer(allocator: Allocator, req: *Request, session: *ArcisSession) !Response {
-    if (!session.tier.caps.infer) return forbidden(allocator);
+    if (!session.tier.tier.caps.infer) return forbidden(allocator);
 
     const prompt = jsonGetString(req.body, "prompt") orelse
         return badRequest(allocator, "missing prompt");
@@ -72,7 +72,7 @@ pub fn handleInfer(allocator: Allocator, req: *Request, session: *ArcisSession) 
 // POST /rag   body: {"query": "..."}
 
 pub fn handleRag(allocator: Allocator, req: *Request, session: *ArcisSession) !Response {
-    if (!session.tier.caps.rag) return forbidden(allocator);
+    if (!session.tier.tier.caps.rag) return forbidden(allocator);
     const query = jsonGetString(req.body, "query") orelse
         return badRequest(allocator, "missing query");
     _ = query;
@@ -111,7 +111,7 @@ pub fn handleSearch(allocator: Allocator, req: *Request, session: *ArcisSession)
 // POST /name   body: {"kind": "wizard", "tradition": "greek", "rank": "sage"}
 
 pub fn handleName(allocator: Allocator, req: *Request, session: *ArcisSession) !Response {
-    if (!session.tier.caps.naming) return forbidden(allocator);
+    if (!session.tier.tier.caps.naming) return forbidden(allocator);
     const kind_s = jsonGetString(req.body, "kind") orelse "wizard";
     const trad_s = jsonGetString(req.body, "tradition") orelse "greek";
     const rank_s = jsonGetString(req.body, "rank") orelse "adept";
@@ -141,7 +141,7 @@ pub fn handleName(allocator: Allocator, req: *Request, session: *ArcisSession) !
 // POST /workflow/run   body: {"workflow_id": 1, "payload": "..."}
 
 pub fn handleWorkflowRun(allocator: Allocator, req: *Request, session: *ArcisSession) !Response {
-    if (!session.tier.caps.workflow) return forbidden(allocator);
+    if (!session.tier.tier.caps.workflow) return forbidden(allocator);
     const wf_id_str = jsonGetString(req.body, "workflow_id") orelse
         return badRequest(allocator, "missing workflow_id");
     const wf_id = std.fmt.parseInt(u64, wf_id_str, 10) catch
@@ -164,7 +164,7 @@ pub fn handleWorkflowRun(allocator: Allocator, req: *Request, session: *ArcisSes
 // POST /term/validate  body: {"id": 1}
 
 pub fn handleTermPropose(allocator: Allocator, req: *Request, session: *ArcisSession) !Response {
-    if (!session.tier.caps.ontology) return forbidden(allocator);
+    if (!session.tier.tier.caps.ontology) return forbidden(allocator);
     const label = jsonGetString(req.body, "label") orelse
         return badRequest(allocator, "missing label");
     const def    = jsonGetString(req.body, "definition") orelse "";
@@ -175,7 +175,7 @@ pub fn handleTermPropose(allocator: Allocator, req: *Request, session: *ArcisSes
 }
 
 pub fn handleTermValidate(allocator: Allocator, req: *Request, session: *ArcisSession) !Response {
-    if (!session.tier.caps.ontology) return forbidden(allocator);
+    if (!session.tier.tier.caps.ontology) return forbidden(allocator);
     const id_str = jsonGetString(req.body, "id") orelse
         return badRequest(allocator, "missing id");
     const id = std.fmt.parseInt(u64, id_str, 10) catch
