@@ -37,7 +37,7 @@ pub const ArcisSession = struct {
     /// Initialise the full engine. tier_name: "forma" | "figura" | "visio".
     pub fn init(allocator: Allocator, tier_name: []const u8) !ArcisSession {
         var seq        = IdSequence.init();
-        const concepts = ConceptStore.init(allocator, &seq);
+        var concepts   = ConceptStore.init(allocator, &seq);
         const terms    = TermDir.init(allocator, &concepts);
         const catalog  = Catalog.init(allocator, &seq);
         const names    = NameStore.init(allocator, &seq);
