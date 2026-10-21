@@ -76,7 +76,7 @@ pub const ArcisSession = struct {
         self.names.deinit();
         self.search.deinit();
         self.workflow.deinit();
-        self.tier.deinit();
+        // TierDispatcher holds no owned resources
     }
 };
 
