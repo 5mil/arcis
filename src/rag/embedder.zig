@@ -45,7 +45,7 @@ pub const Embedder = struct {
         const ids = try self.tokenizer.encode(text, false);
         defer self.allocator.free(ids);
 
-        var kv = try KVCache.init(
+        const kv = try KVCache.init(
             self.allocator,
             self.cfg.n_layers,
             self.cfg.embed_dim,
@@ -56,7 +56,7 @@ pub const Embedder = struct {
 
         // Accumulate hidden states for mean pooling.
         const E = self.cfg.embed_dim;
-        var pool = try self.allocator.alloc(f32, E);
+        const pool = try self.allocator.alloc(f32, E);
         defer self.allocator.free(pool);
         @memset(std.mem.sliceAsBytes(pool), 0);
 
