@@ -91,8 +91,7 @@ pub const UnifiedSearchIndex = struct {
         embedding: []const f32,
     ) !void {
         try self.keyword.indexDocument(entity_id, text);
-        try self.vectors.add("doc", 0, embedding);
-        _ = entity_id;
+        _ = try self.vectors.add("doc", 0, embedding);
     }
 
     /// Keyword search. Returns matching entity IDs.
