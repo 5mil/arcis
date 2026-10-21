@@ -65,12 +65,11 @@ pub const NameStore = struct {
     ) !EntityId {
         var attempt: u64 = 0;
         while (attempt < 16) : (attempt += 1) {
-            const value = try generateName(self.allocator, tradition, rank, seed + attempt);
-            if (self.name_index.contains(value)) {
-                self.allocator.free(value);
-                continue;
-            }
-            return try self.register(value, kind, tradition, rank, null);
+            var buf: [128]u8 = undefined;
+            const generated = generateName(&buf, tradition, rank, seed + attempt);
+            if (self.name_index.contains(generated)) continue;
+            const owned = try self.allocator.dupe(u8, generated);
+            return try self.register(owned, kind, tradition, rank, null);
         }
         return error.NameGenerationExhausted;
     }
