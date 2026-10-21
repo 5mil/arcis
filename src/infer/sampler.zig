@@ -48,7 +48,6 @@ pub fn softmax(logits: []f32) void {
 /// Top-k filter: zero out all logits except the top-k highest.
 pub fn applyTopK(logits: []f32, k: u32, allocator: std.mem.Allocator) !void {
     if (k == 0 or k >= logits.len) return;
-    // Build index array, sort by logit descending, zero below threshold.
     const indices = try allocator.alloc(usize, logits.len);
     defer allocator.free(indices);
     for (indices, 0..) |*idx, i| idx.* = i;
@@ -121,6 +120,8 @@ pub fn nextToken(
     // Re-normalize after top-p zeroing.
     var sum: f32 = 0.0;
     for (logits) |v| sum += v;
-    if (sum > 0) for (logits) |*v| v.* /= sum;
+    if (sum > 0) {
+        for (logits) |*v| v.* /= sum;
+    }
     return sample(logits, rng);
 }
