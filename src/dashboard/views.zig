@@ -5,10 +5,11 @@
 
 const std = @import("std");
 const Allocator  = std.mem.Allocator;
-const EntityId   = @import("../common/id.zig").EntityId;
-const TextRecord = @import("../common/schema.zig").TextRecord;
-const Concept    = @import("../common/schema.zig").Concept;
-const Status     = @import("../common/schema.zig").Status;
+const common     = @import("common");
+const EntityId   = common.EntityId;
+const TextRecord = common.TextRecord;
+const Concept    = common.Concept;
+const Status     = common.Status;
 
 // ---------------------------------------------------------------------------
 // View kinds
