@@ -18,6 +18,60 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
+    const import_mod = b.createModule(.{
+        .root_source_file = b.path("src/import/importer.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    import_mod.addImport("common", common_mod);
+
+    const ontology_mod = b.createModule(.{
+        .root_source_file = b.path("src/ontology/concept_store.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    ontology_mod.addImport("common", common_mod);
+
+    const library_mod = b.createModule(.{
+        .root_source_file = b.path("src/library/catalog.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    library_mod.addImport("common", common_mod);
+    library_mod.addImport("import", import_mod);
+
+    const naming_mod = b.createModule(.{
+        .root_source_file = b.path("src/naming/name_store.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    naming_mod.addImport("common", common_mod);
+
+    const search_mod = b.createModule(.{
+        .root_source_file = b.path("src/search/index.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    search_mod.addImport("common", common_mod);
+
+    const workflow_mod = b.createModule(.{
+        .root_source_file = b.path("src/workflow/workflow_session.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+
+    const infer_mod = b.createModule(.{
+        .root_source_file = b.path("src/infer/engine.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+
+    const api_mod = b.createModule(.{
+        .root_source_file = b.path("src/api/tier.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+
     // ---------------------------------------------------------------------------
     // Main executable (root_module style — works on 0.14 and 0.15+)
     // ---------------------------------------------------------------------------
@@ -73,6 +127,14 @@ pub fn build(b: *std.Build) void {
             .optimize = optimize,
         });
         test_mod.addImport("common", common_mod);
+        test_mod.addImport("import", import_mod);
+        test_mod.addImport("ontology", ontology_mod);
+        test_mod.addImport("library", library_mod);
+        test_mod.addImport("naming", naming_mod);
+        test_mod.addImport("search", search_mod);
+        test_mod.addImport("workflow", workflow_mod);
+        test_mod.addImport("infer", infer_mod);
+        test_mod.addImport("api", api_mod);
 
         const t = b.addTest(.{
             .name = sys.name,
