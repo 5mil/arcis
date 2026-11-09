@@ -5,8 +5,8 @@
 
 const std = @import("std");
 const Allocator = std.mem.Allocator;
-const TextRecord  = @import("../common/schema.zig").TextRecord;
 const common      = @import("common");
+const TextRecord  = common.TextRecord;
 const EntityId    = common.EntityId;
 const IdSequence  = common.IdSequence;
 const makeUrn     = common.makeUrn;
