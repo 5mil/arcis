@@ -29,16 +29,16 @@ pub fn textToJson(allocator: Allocator, rec: TextRecord) ![]u8 {
     errdefer buf.deinit();
     const w = buf.writer();
     try w.print(
-        "{{{\n" ++
-        "  \"id\": {d},{\n" ++
-        "  \"urn\": \"{s}\",{\n" ++
-        "  \"title\": \"{s}\",{\n" ++
-        "  \"author\": \"{s}\",{\n" ++
-        "  \"language\": \"{s}\",{\n" ++
-        "  \"period\": \"{s}\",{\n" ++
-        "  \"source_tradition\": \"{s}\",{\n" ++
-        "  \"has_translation\": {},{\n" ++
-        "  \"body_length\": {d}{\n" ++
+        "{{\n" ++
+        "  \"id\": {d},\n" ++
+        "  \"urn\": \"{s}\",\n" ++
+        "  \"title\": \"{s}\",\n" ++
+        "  \"author\": \"{s}\",\n" ++
+        "  \"language\": \"{s}\",\n" ++
+        "  \"period\": \"{s}\",\n" ++
+        "  \"source_tradition\": \"{s}\",\n" ++
+        "  \"has_translation\": {any},\n" ++
+        "  \"body_length\": {d}\n" ++
         "}}",
         .{
             rec.id, rec.urn, rec.title, rec.author,
@@ -83,14 +83,14 @@ pub fn conceptToJson(allocator: Allocator, c: Concept) ![]u8 {
     errdefer buf.deinit();
     const w = buf.writer();
     try w.print(
-        "{{{\n" ++
-        "  \"id\": {d},{\n" ++
-        "  \"urn\": \"{s}\",{\n" ++
-        "  \"label\": \"{s}\",{\n" ++
-        "  \"definition\": \"{s}\",{\n" ++
-        "  \"domain\": \"{s}\",{\n" ++
-        "  \"status\": \"{s}\",{\n" ++
-        "  \"modifiable\": {}{\n" ++
+        "{{\n" ++
+        "  \"id\": {d},\n" ++
+        "  \"urn\": \"{s}\",\n" ++
+        "  \"label\": \"{s}\",\n" ++
+        "  \"definition\": \"{s}\",\n" ++
+        "  \"domain\": \"{s}\",\n" ++
+        "  \"status\": \"{s}\",\n" ++
+        "  \"modifiable\": {any}\n" ++
         "}}",
         .{
             c.id, c.urn, c.label, c.definition,
