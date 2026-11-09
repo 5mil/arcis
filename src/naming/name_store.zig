@@ -3,10 +3,11 @@
 
 const std = @import("std");
 const Allocator  = std.mem.Allocator;
-const EntityId   = @import("../common/id.zig").EntityId;
-const IdSequence = @import("../common/id.zig").IdSequence;
-const makeUrn    = @import("../common/id.zig").makeUrn;
-const URN_BUF_SIZE = @import("../common/id.zig").URN_BUF_SIZE;
+const common     = @import("common");
+const EntityId   = common.EntityId;
+const IdSequence = common.IdSequence;
+const makeUrn    = common.makeUrn;
+const URN_BUF_SIZE = common.URN_BUF_SIZE;
 const Status     = @import("../common/schema.zig").Status;
 const Tradition  = @import("rules.zig").Tradition;
 const Rank       = @import("rules.zig").Rank;
