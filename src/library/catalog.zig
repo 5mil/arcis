@@ -67,6 +67,11 @@ pub const Catalog = struct {
     }
 
     pub fn deinit(self: *Catalog) void {
+        // Free owned body and URN strings created by the importer
+        for (self.texts.items.items) |t| {
+            self.allocator.free(t.body);
+            self.allocator.free(t.urn);
+        }
         self.texts.deinit();
         self.tag_index.deinit();
     }
