@@ -7,12 +7,12 @@ const Allocator = std.mem.Allocator;
 // Subsystem imports via named modules (resolves even when this file is a test root)
 const common       = @import("common");
 const IdSequence    = common.IdSequence;
-const ConceptStore  = @import("ontology").ConceptStore;
-// TerminologyDirectory lives in terminology.zig; import via relative only if same module root.
-// For test isolation we re-export it from the ontology module or import directly when available.
-const TermDir       = @import("../ontology/terminology.zig").TerminologyDirectory;
-const Catalog       = @import("library").Catalog;
-const Viewer        = @import("../library/viewer.zig").Viewer;
+const ontology      = @import("ontology");
+const ConceptStore  = ontology.ConceptStore;
+const TermDir       = ontology.TerminologyDirectory;
+const library       = @import("library");
+const Catalog       = library.Catalog;
+const Viewer        = library.Viewer;
 const NameStore     = @import("naming").NameStore;
 const UnifiedSearch = @import("search").UnifiedSearchIndex;
 const WorkflowSession = @import("workflow").WorkflowSession;
