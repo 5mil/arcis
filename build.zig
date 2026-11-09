@@ -26,14 +26,14 @@ pub fn build(b: *std.Build) void {
     import_mod.addImport("common", common_mod);
 
     const ontology_mod = b.createModule(.{
-        .root_source_file = b.path("src/ontology/concept_store.zig"),
+        .root_source_file = b.path("src/ontology/root.zig"),
         .target = target,
         .optimize = optimize,
     });
     ontology_mod.addImport("common", common_mod);
 
     const library_mod = b.createModule(.{
-        .root_source_file = b.path("src/library/catalog.zig"),
+        .root_source_file = b.path("src/library/root.zig"),
         .target = target,
         .optimize = optimize,
     });
