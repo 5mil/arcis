@@ -32,7 +32,7 @@ pub const RAGPipeline = struct {
     /// Caller owns returned slice.
     fn buildPrompt(
         self: *RAGPipeline,
-        query: []const u8,
+        user_query: []const u8,
         passages: []const RetrievedPassage,
     ) ![]u8 {
         var buf = std.ArrayList(u8).init(self.allocator);
@@ -43,7 +43,7 @@ pub const RAGPipeline = struct {
                 .{ i, p.source_id, p.chunk_idx, p.score, p.text });
         }
         try buf.appendSlice("### Question\n");
-        try buf.appendSlice(query);
+        try buf.appendSlice(user_query);
         try buf.appendSlice("\n\n### Answer\n");
         return buf.toOwnedSlice();
     }
