@@ -7,9 +7,10 @@ const std = @import("std");
 const Allocator  = std.mem.Allocator;
 const common     = @import("common");
 const EntityId   = common.EntityId;
-const Embedder   = @import("../rag/embedder.zig").Embedder;
-const VectorIndex = @import("../rag/index.zig").VectorIndex;
-const ScoredDoc  = @import("../rag/index.zig").SearchResult;
+const rag        = @import("rag");
+const Embedder   = rag.Embedder;
+const VectorIndex = rag.VectorIndex;
+const ScoredDoc  = rag.SearchResult;
 
 // ---------------------------------------------------------------------------
 // SearchResult
