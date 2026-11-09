@@ -4,15 +4,16 @@
 
 const std = @import("std");
 const Allocator  = std.mem.Allocator;
-const Concept    = @import("../common/schema.zig").Concept;
-const Relation   = @import("../common/schema.zig").Relation;
-const RelationKind = @import("../common/schema.zig").RelationKind;
-const Status     = @import("../common/schema.zig").Status;
+const common     = @import("common");
+const Concept    = common.Concept;
+const Relation   = common.Relation;
+const RelationKind = common.RelationKind;
+const Status     = common.Status;
 const EntityStore = @import("../common/store.zig").EntityStore;
-const EntityId   = @import("../common/id.zig").EntityId;
-const IdSequence = @import("../common/id.zig").IdSequence;
-const makeUrn    = @import("../common/id.zig").makeUrn;
-const URN_BUF_SIZE = @import("../common/id.zig").URN_BUF_SIZE;
+const EntityId   = common.EntityId;
+const IdSequence = common.IdSequence;
+const makeUrn    = common.makeUrn;
+const URN_BUF_SIZE = common.URN_BUF_SIZE;
 
 // ---------------------------------------------------------------------------
 // ConceptStore
