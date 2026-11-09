@@ -3,7 +3,8 @@
 
 const std = @import("std");
 const Allocator  = std.mem.Allocator;
-const EntityId   = @import("../common/id.zig").EntityId;
+const common     = @import("common");
+const EntityId   = common.EntityId;
 const UnifiedSearchIndex = @import("index.zig").UnifiedSearchIndex;
 const SearchResult = @import("index.zig").SearchResult;
 const Embedder   = @import("../rag/embedder.zig").Embedder;
