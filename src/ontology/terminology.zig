@@ -5,8 +5,8 @@
 const std = @import("std");
 const Allocator   = std.mem.Allocator;
 const ConceptStore = @import("concept_store.zig").ConceptStore;
-const Status      = @import("../common/schema.zig").Status;
 const common      = @import("common");
+const Status      = common.Status;
 const EntityId    = common.EntityId;
 
 // ---------------------------------------------------------------------------
