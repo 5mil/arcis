@@ -4,6 +4,7 @@
 
 const std = @import("std");
 const Allocator  = std.mem.Allocator;
+const schema     = @import("common"); // note: schema types are in schema.zig; keep relative for now or expand module
 const TextRecord = @import("../common/schema.zig").TextRecord;
 const Concept    = @import("../common/schema.zig").Concept;
 const Relation   = @import("../common/schema.zig").Relation;
@@ -131,11 +132,10 @@ test "textToPlain round-trip" {
 
 test "conceptToJson contains label" {
     const allocator = std.testing.allocator;
-    const schema = @import("../common/schema.zig");
     const c = Concept{
         .id = 1, .urn = "arcis:concept:00000001",
         .label = "logos", .definition = "reason", .domain = "philosophy",
-        .status = schema.Status.validated, .modifiable = false,
+        .status = .validated, .modifiable = false,
         .source_urns = &.{}, .created_at = 0, .updated_at = 0,
     };
     const out = try conceptToJson(allocator, c);
