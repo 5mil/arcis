@@ -5,7 +5,8 @@ const std = @import("std");
 const Allocator  = std.mem.Allocator;
 const TextRecord = @import("../common/schema.zig").TextRecord;
 const Catalog    = @import("catalog.zig").Catalog;
-const EntityId   = @import("../common/id.zig").EntityId;
+const common     = @import("common");
+const EntityId   = common.EntityId;
 
 // ---------------------------------------------------------------------------
 // Page
@@ -75,7 +76,7 @@ pub const Viewer = struct {
 
 test "Viewer pagination" {
     const allocator = std.testing.allocator;
-    var seq = @import("../common/id.zig").IdSequence.init();
+    var seq = common.IdSequence.init();
     var cat = @import("catalog.zig").Catalog.init(allocator, &seq);
     defer cat.deinit();
 
