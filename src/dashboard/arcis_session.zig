@@ -5,7 +5,8 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 
 // Subsystem imports
-const IdSequence    = @import("../common/id.zig").IdSequence;
+const common       = @import("common");
+const IdSequence    = common.IdSequence;
 const ConceptStore  = @import("../ontology/concept_store.zig").ConceptStore;
 const TermDir       = @import("../ontology/terminology.zig").TerminologyDirectory;
 const Catalog       = @import("../library/catalog.zig").Catalog;
