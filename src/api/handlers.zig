@@ -117,6 +117,8 @@ pub fn handleName(allocator: Allocator, req: *Request, session: *ArcisSession) !
     const rank_s = jsonGetString(req.body, "rank") orelse "adept";
 
     const NameKind  = @import("naming").NameKind;
+    // rules.zig is a sibling of name_store; import via relative only if same module.
+    // For now keep relative — it will be resolved when naming module re-exports them.
     const Tradition = @import("../naming/rules.zig").Tradition;
     const Rank      = @import("../naming/rules.zig").Rank;
 
