@@ -6,7 +6,8 @@ const std = @import("std");
 const Allocator   = std.mem.Allocator;
 const ConceptStore = @import("concept_store.zig").ConceptStore;
 const Status      = @import("../common/schema.zig").Status;
-const EntityId    = @import("../common/id.zig").EntityId;
+const common      = @import("common");
+const EntityId    = common.EntityId;
 
 // ---------------------------------------------------------------------------
 // TerminologyDirectory
@@ -85,7 +86,7 @@ pub const TerminologyDirectory = struct {
 
 test "TerminologyDirectory propose and validate" {
     const allocator = std.testing.allocator;
-    var seq = @import("../common/id.zig").IdSequence.init();
+    var seq = common.IdSequence.init();
     var cs  = ConceptStore.init(allocator, &seq);
     defer cs.deinit();
     var td  = TerminologyDirectory.init(allocator, &cs);
@@ -100,7 +101,7 @@ test "TerminologyDirectory propose and validate" {
 
 test "TerminologyDirectory fork" {
     const allocator = std.testing.allocator;
-    var seq = @import("../common/id.zig").IdSequence.init();
+    var seq = common.IdSequence.init();
     var cs  = ConceptStore.init(allocator, &seq);
     defer cs.deinit();
     var td  = TerminologyDirectory.init(allocator, &cs);
