@@ -157,7 +157,7 @@ pub fn compute(allocator: Allocator, buf: AudioBuffer, cfg: MelConfig) !MelSpect
     const data    = try allocator.alloc(f32, n_frames * cfg.n_mels);
     errdefer allocator.free(data);
 
-    var power_buf = try allocator.alloc(f32, n_bins);
+    const power_buf = try allocator.alloc(f32, n_bins);
     defer allocator.free(power_buf);
     var frame_buf = try allocator.alloc(f32, cfg.n_fft);
     defer allocator.free(frame_buf);
