@@ -4,10 +4,10 @@
 
 const std = @import("std");
 const Allocator  = std.mem.Allocator;
-const schema     = @import("common"); // note: schema types are in schema.zig; keep relative for now or expand module
-const TextRecord = @import("../common/schema.zig").TextRecord;
-const Concept    = @import("../common/schema.zig").Concept;
-const Relation   = @import("../common/schema.zig").Relation;
+const common     = @import("common");
+const TextRecord = common.TextRecord;
+const Concept    = common.Concept;
+const Relation   = common.Relation;
 
 // ---------------------------------------------------------------------------
 // Export format
