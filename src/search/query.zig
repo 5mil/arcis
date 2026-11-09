@@ -56,7 +56,7 @@ pub const QueryEngine = struct {
         var ids = std.ArrayList(EntityId).init(self.allocator);
         defer ids.deinit();
         try self.index.searchKeyword(q.text, &ids);
-        var results = try self.allocator.alloc(SearchResult, @min(ids.items.len, q.top_k));
+        const results = try self.allocator.alloc(SearchResult, @min(ids.items.len, q.top_k));
         for (results, 0..) |*r, i| {
             r.* = .{ .entity_id = ids.items[i], .score = 1.0, .kind = "entity", .excerpt = q.text };
         }
@@ -68,7 +68,7 @@ pub const QueryEngine = struct {
         defer self.allocator.free(emb);
         const scored = try self.index.searchSemantic(emb, q.top_k);
         defer self.allocator.free(scored);
-        var results = try self.allocator.alloc(SearchResult, scored.len);
+        const results = try self.allocator.alloc(SearchResult, scored.len);
         for (results, scored) |*r, s| {
             r.* = .{ .entity_id = @intCast(s.doc_id), .score = s.score, .kind = "entity", .excerpt = "" };
         }
@@ -81,7 +81,7 @@ pub const QueryEngine = struct {
         const sem = try self.runSemantic(q);
         defer self.allocator.free(sem);
         // Simple merge: keyword results first, then semantic (deduplicated in Phase 12).
-        var merged = try self.allocator.alloc(SearchResult, kw.len + sem.len);
+        const merged = try self.allocator.alloc(SearchResult, kw.len + sem.len);
         @memcpy(merged[0..kw.len], kw);
         @memcpy(merged[kw.len..], sem);
         return merged;
