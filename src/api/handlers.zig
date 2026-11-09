@@ -5,7 +5,7 @@ const std       = @import("std");
 const Allocator = std.mem.Allocator;
 const Request   = @import("server.zig").Request;
 const Response  = @import("server.zig").Response;
-const ArcisSession = @import("../dashboard/arcis_session.zig").ArcisSession;
+const ArcisSession = @import("dashboard").ArcisSession;
 
 // ---------------------------------------------------------------------------
 // Health
@@ -116,7 +116,7 @@ pub fn handleName(allocator: Allocator, req: *Request, session: *ArcisSession) !
     const trad_s = jsonGetString(req.body, "tradition") orelse "greek";
     const rank_s = jsonGetString(req.body, "rank") orelse "adept";
 
-    const NameKind  = @import("../naming/name_store.zig").NameKind;
+    const NameKind  = @import("naming").NameKind;
     const Tradition = @import("../naming/rules.zig").Tradition;
     const Rank      = @import("../naming/rules.zig").Rank;
 
