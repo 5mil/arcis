@@ -6,10 +6,11 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const TextRecord  = @import("../common/schema.zig").TextRecord;
-const EntityId    = @import("../common/id.zig").EntityId;
-const IdSequence  = @import("../common/id.zig").IdSequence;
-const makeUrn     = @import("../common/id.zig").makeUrn;
-const URN_BUF_SIZE = @import("../common/id.zig").URN_BUF_SIZE;
+const common      = @import("common");
+const EntityId    = common.EntityId;
+const IdSequence  = common.IdSequence;
+const makeUrn     = common.makeUrn;
+const URN_BUF_SIZE = common.URN_BUF_SIZE;
 
 // ---------------------------------------------------------------------------
 // Import format
@@ -165,7 +166,7 @@ test "detectFormat" {
 
 test "Importer.importText" {
     const allocator = std.testing.allocator;
-    var seq = @import("../common/id.zig").IdSequence.init();
+    var seq = common.IdSequence.init();
     var imp = Importer.init(allocator, &seq);
     const rec = try imp.importText("Hello world", .{ .title = "Test" });
     defer allocator.free(rec.body);
