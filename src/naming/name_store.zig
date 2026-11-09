@@ -51,6 +51,10 @@ pub const NameStore = struct {
     }
 
     pub fn deinit(self: *NameStore) void {
+        for (self.names.items) |rec| {
+            self.allocator.free(rec.urn);
+            self.allocator.free(rec.value);
+        }
         self.names.deinit();
         self.name_index.deinit();
     }
