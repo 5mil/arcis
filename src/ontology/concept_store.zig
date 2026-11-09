@@ -35,6 +35,13 @@ pub const ConceptStore = struct {
     }
 
     pub fn deinit(self: *ConceptStore) void {
+        // Free owned URN strings
+        for (self.concepts.items.items) |c| {
+            self.allocator.free(c.urn);
+        }
+        for (self.relations.items.items) |r| {
+            self.allocator.free(r.urn);
+        }
         self.concepts.deinit();
         self.relations.deinit();
     }
