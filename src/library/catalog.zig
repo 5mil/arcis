@@ -4,11 +4,12 @@
 
 const std = @import("std");
 const Allocator  = std.mem.Allocator;
-const TextRecord = @import("../common/schema.zig").TextRecord;
-const Concept    = @import("../common/schema.zig").Concept;
+const common     = @import("common");
+const TextRecord = common.TextRecord;
+const Concept    = common.Concept;
 const EntityStore = @import("../common/store.zig").EntityStore;
-const EntityId   = @import("../common/id.zig").EntityId;
-const IdSequence = @import("../common/id.zig").IdSequence;
+const EntityId   = common.EntityId;
+const IdSequence = common.IdSequence;
 const Importer   = @import("../import/importer.zig").Importer;
 const ImportMeta = @import("../import/importer.zig").ImportMeta;
 
