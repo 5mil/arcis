@@ -4,19 +4,19 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 
-// Subsystem imports
+// Subsystem imports via named modules (resolves even when this file is a test root)
 const common       = @import("common");
 const IdSequence    = common.IdSequence;
-const ConceptStore  = @import("../ontology/concept_store.zig").ConceptStore;
-const TermDir       = @import("../ontology/terminology.zig").TerminologyDirectory;
-const Catalog       = @import("../library/catalog.zig").Catalog;
+const ConceptStore  = @import("ontology").ConceptStore;
+const TermDir       = @import("../ontology/terminology.zig").TerminologyDirectory; // same-dir relative still works from ontology root
+const Catalog       = @import("library").Catalog;
 const Viewer        = @import("../library/viewer.zig").Viewer;
-const NameStore     = @import("../naming/name_store.zig").NameStore;
-const UnifiedSearch = @import("../search/index.zig").UnifiedSearchIndex;
-const WorkflowSession = @import("../workflow/workflow_session.zig").WorkflowSession;
-const TierDispatcher = @import("../api/tier.zig").TierDispatcher;
+const NameStore     = @import("naming").NameStore;
+const UnifiedSearch = @import("search").UnifiedSearchIndex;
+const WorkflowSession = @import("workflow").WorkflowSession;
+const TierDispatcher = @import("api").TierDispatcher;
 const ViewBuilder   = @import("views.zig").ViewBuilder;
-const InferenceEngine = @import("../infer/engine.zig").InferenceEngine;
+const InferenceEngine = @import("infer").InferenceEngine;
 
 // ---------------------------------------------------------------------------
 // ArcisSession
