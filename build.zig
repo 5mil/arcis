@@ -41,11 +41,17 @@ pub fn build(b: *std.Build) void {
     library_mod.addImport("import", import_mod);
 
     const naming_mod = b.createModule(.{
-        .root_source_file = b.path("src/naming/name_store.zig"),
+        .root_source_file = b.path("src/naming/root.zig"),
         .target = target,
         .optimize = optimize,
     });
     naming_mod.addImport("common", common_mod);
+
+    const rag_mod = b.createModule(.{
+        .root_source_file = b.path("src/rag/root.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
 
     const search_mod = b.createModule(.{
         .root_source_file = b.path("src/search/index.zig"),
@@ -53,9 +59,10 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
     search_mod.addImport("common", common_mod);
+    search_mod.addImport("rag", rag_mod);
 
     const workflow_mod = b.createModule(.{
-        .root_source_file = b.path("src/workflow/workflow_session.zig"),
+        .root_source_file = b.path("src/workflow/root.zig"),
         .target = target,
         .optimize = optimize,
     });
@@ -87,6 +94,7 @@ pub fn build(b: *std.Build) void {
     });
     api_mod.addImport("dashboard", dashboard_mod);
     api_mod.addImport("naming", naming_mod);
+    api_mod.addImport("workflow", workflow_mod);
 
     // ---------------------------------------------------------------------------
     // Main executable (root_module style — works on 0.14 and 0.15+)
@@ -157,10 +165,15 @@ pub fn build(b: *std.Build) void {
             test_mod.addImport("search", search_mod);
             test_mod.addImport("workflow", workflow_mod);
             test_mod.addImport("infer", infer_mod);
+            test_mod.addImport("api", api_mod);
         }
         if (std.mem.eql(u8, sys.name, "api")) {
             test_mod.addImport("dashboard", dashboard_mod);
             test_mod.addImport("naming", naming_mod);
+            test_mod.addImport("workflow", workflow_mod);
+        }
+        if (std.mem.eql(u8, sys.name, "search")) {
+            test_mod.addImport("rag", rag_mod);
         }
 
         const t = b.addTest(.{
