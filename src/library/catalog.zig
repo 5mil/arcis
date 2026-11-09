@@ -10,8 +10,9 @@ const Concept    = common.Concept;
 const EntityStore = common.EntityStore;
 const EntityId   = common.EntityId;
 const IdSequence = common.IdSequence;
-const Importer   = @import("../import/importer.zig").Importer;
-const ImportMeta = @import("../import/importer.zig").ImportMeta;
+const import_mod = @import("import");
+const Importer   = import_mod.Importer;
+const ImportMeta = import_mod.ImportMeta;
 
 // ---------------------------------------------------------------------------
 // TextIndex — inverted tag index for fast thematic lookup
