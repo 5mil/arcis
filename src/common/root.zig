@@ -14,3 +14,5 @@ pub const Relation = @import("schema.zig").Relation;
 pub const RelationKind = @import("schema.zig").RelationKind;
 pub const TextRecord = @import("schema.zig").TextRecord;
 pub const Annotation = @import("schema.zig").Annotation;
+
+pub const EntityStore = @import("store.zig").EntityStore;
