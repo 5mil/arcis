@@ -61,7 +61,7 @@ pub const Agent = struct {
                 var result = try self.registry.dispatch(call, self.allocator);
                 defer result.deinit();
                 // Observation is injected; final answer accumulates from non-tool steps.
-                _ = result;
+                // result is used via defer deinit
             } else {
                 // No tool call: this is the final answer thought.
                 try final_answer.appendSlice(step.thought);
