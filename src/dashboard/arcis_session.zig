@@ -8,7 +8,9 @@ const Allocator = std.mem.Allocator;
 const common       = @import("common");
 const IdSequence    = common.IdSequence;
 const ConceptStore  = @import("ontology").ConceptStore;
-const TermDir       = @import("../ontology/terminology.zig").TerminologyDirectory; // same-dir relative still works from ontology root
+// TerminologyDirectory lives in terminology.zig; import via relative only if same module root.
+// For test isolation we re-export it from the ontology module or import directly when available.
+const TermDir       = @import("../ontology/terminology.zig").TerminologyDirectory;
 const Catalog       = @import("library").Catalog;
 const Viewer        = @import("../library/viewer.zig").Viewer;
 const NameStore     = @import("naming").NameStore;
