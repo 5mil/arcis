@@ -12,10 +12,8 @@ pub fn build(b: *std.Build) void {
     // Shared modules (allow tests rooted in subdirs to import common/ etc.)
     // ---------------------------------------------------------------------------
     const common_mod = b.createModule(.{
-        .root_source_file = b.path("src/common/id.zig"),
+        .root_source_file = b.path("src/common/root.zig"),
     });
-    // Re-export the other common files via the same module by adding them as imports
-    // (tests will use @import("common") for id, and relative still works for same-dir)
 
     // ---------------------------------------------------------------------------
     // Main executable
