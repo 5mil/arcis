@@ -1,6 +1,7 @@
 //! build.zig — Arcis engine build script
-//! Phase 12 — Refinement & Delivery
-//! Zig build system: one binary, all subsystems wired, tier selectable at runtime.
+//! Compatible with Zig 0.14 and 0.15+
+//! Uses root_module so it works after the 0.15 removal of the deprecated
+//! root_source_file field on ExecutableOptions / TestOptions.
 
 const std = @import("std");
 
@@ -9,20 +10,27 @@ pub fn build(b: *std.Build) void {
     const optimize = b.standardOptimizeOption(.{});
 
     // ---------------------------------------------------------------------------
-    // Shared modules (allow tests rooted in subdirs to import common/ etc.)
+    // Shared modules
     // ---------------------------------------------------------------------------
     const common_mod = b.createModule(.{
         .root_source_file = b.path("src/common/root.zig"),
+        .target = target,
+        .optimize = optimize,
     });
 
     // ---------------------------------------------------------------------------
-    // Main executable
+    // Main executable (root_module style — works on 0.14 and 0.15+)
     // ---------------------------------------------------------------------------
-    const exe = b.addExecutable(.{
-        .name    = "arcis",
+    const exe_mod = b.createModule(.{
         .root_source_file = b.path("src/main.zig"),
-        .target  = target,
+        .target = target,
         .optimize = optimize,
+    });
+    exe_mod.addImport("common", common_mod);
+
+    const exe = b.addExecutable(.{
+        .name = "arcis",
+        .root_module = exe_mod,
     });
     b.installArtifact(exe);
 
@@ -59,15 +67,18 @@ pub fn build(b: *std.Build) void {
     const test_all_step = b.step("test", "Run all subsystem tests");
 
     inline for (subsystems) |sys| {
-        const t = b.addTest(.{
-            .name             = sys.name,
+        const test_mod = b.createModule(.{
             .root_source_file = b.path(sys.path),
-            .target           = target,
-            .optimize         = optimize,
-            .filter           = test_filter,
+            .target = target,
+            .optimize = optimize,
         });
-        // Attach common module so @import("common") works even when file is test root
-        t.root_module.addImport("common", common_mod);
+        test_mod.addImport("common", common_mod);
+
+        const t = b.addTest(.{
+            .name = sys.name,
+            .root_module = test_mod,
+            .filter = test_filter,
+        });
 
         const run_t = b.addRunArtifact(t);
         test_all_step.dependOn(&run_t.step);
