@@ -171,7 +171,7 @@ pub fn resample(allocator: Allocator, src: AudioBuffer, target_rate: u32) !Audio
 pub fn readWavResampled(allocator: Allocator, path: []const u8) !AudioBuffer {
     var buf = try readWav(allocator, path);
     if (buf.sample_rate == TARGET_SAMPLE_RATE) return buf;
-    var resampled = try resample(allocator, buf, TARGET_SAMPLE_RATE);
+    const resampled = try resample(allocator, buf, TARGET_SAMPLE_RATE);
     buf.deinit();
     return resampled;
 }
