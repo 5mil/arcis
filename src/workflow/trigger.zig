@@ -93,9 +93,15 @@ pub const TriggerStore = struct {
 // ---------------------------------------------------------------------------
 
 test "CronSpec wildcard fires every second" {
-    const spec = CronSpec{}; // second=0, all wildcards
+    // Explicit wildcards for second/minute/hour so it fires at any time
+    const spec = CronSpec{
+        .second = 255,
+        .minute = 255,
+        .hour   = 255,
+    };
     try std.testing.expect(TriggerStore.cronFires(spec, 0));
     try std.testing.expect(TriggerStore.cronFires(spec, 3600));
+    try std.testing.expect(TriggerStore.cronFires(spec, 1234567890));
 }
 
 test "TriggerStore findByEvent" {
