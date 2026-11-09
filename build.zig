@@ -9,6 +9,15 @@ pub fn build(b: *std.Build) void {
     const optimize = b.standardOptimizeOption(.{});
 
     // ---------------------------------------------------------------------------
+    // Shared modules (allow tests rooted in subdirs to import common/ etc.)
+    // ---------------------------------------------------------------------------
+    const common_mod = b.createModule(.{
+        .root_source_file = b.path("src/common/id.zig"),
+    });
+    // Re-export the other common files via the same module by adding them as imports
+    // (tests will use @import("common") for id, and relative still works for same-dir)
+
+    // ---------------------------------------------------------------------------
     // Main executable
     // ---------------------------------------------------------------------------
     const exe = b.addExecutable(.{
@@ -59,6 +68,9 @@ pub fn build(b: *std.Build) void {
             .optimize         = optimize,
             .filter           = test_filter,
         });
+        // Attach common module so @import("common") works even when file is test root
+        t.root_module.addImport("common", common_mod);
+
         const run_t = b.addRunArtifact(t);
         test_all_step.dependOn(&run_t.step);
 
