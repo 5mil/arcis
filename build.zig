@@ -66,11 +66,27 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
+    // Dashboard module (used by api)
+    const dashboard_mod = b.createModule(.{
+        .root_source_file = b.path("src/dashboard/arcis_session.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    dashboard_mod.addImport("common", common_mod);
+    dashboard_mod.addImport("ontology", ontology_mod);
+    dashboard_mod.addImport("library", library_mod);
+    dashboard_mod.addImport("naming", naming_mod);
+    dashboard_mod.addImport("search", search_mod);
+    dashboard_mod.addImport("workflow", workflow_mod);
+    dashboard_mod.addImport("infer", infer_mod);
+
     const api_mod = b.createModule(.{
         .root_source_file = b.path("src/api/tier.zig"),
         .target = target,
         .optimize = optimize,
     });
+    api_mod.addImport("dashboard", dashboard_mod);
+    api_mod.addImport("naming", naming_mod);
 
     // ---------------------------------------------------------------------------
     // Main executable (root_module style — works on 0.14 and 0.15+)
@@ -96,7 +112,7 @@ pub fn build(b: *std.Build) void {
     run_step.dependOn(&run_cmd.step);
 
     // ---------------------------------------------------------------------------
-    // Test suite
+    // Test suite — attach only the modules each test actually needs
     // ---------------------------------------------------------------------------
     const test_filter = b.option([]const u8, "test-filter", "Filter tests by name");
 
@@ -126,15 +142,26 @@ pub fn build(b: *std.Build) void {
             .target = target,
             .optimize = optimize,
         });
+
+        // Always available
         test_mod.addImport("common", common_mod);
-        test_mod.addImport("import", import_mod);
-        test_mod.addImport("ontology", ontology_mod);
-        test_mod.addImport("library", library_mod);
-        test_mod.addImport("naming", naming_mod);
-        test_mod.addImport("search", search_mod);
-        test_mod.addImport("workflow", workflow_mod);
-        test_mod.addImport("infer", infer_mod);
-        test_mod.addImport("api", api_mod);
+
+        // Only attach modules that the subsystem actually imports
+        if (std.mem.eql(u8, sys.name, "library") or std.mem.eql(u8, sys.name, "dashboard")) {
+            test_mod.addImport("import", import_mod);
+        }
+        if (std.mem.eql(u8, sys.name, "dashboard")) {
+            test_mod.addImport("ontology", ontology_mod);
+            test_mod.addImport("library", library_mod);
+            test_mod.addImport("naming", naming_mod);
+            test_mod.addImport("search", search_mod);
+            test_mod.addImport("workflow", workflow_mod);
+            test_mod.addImport("infer", infer_mod);
+        }
+        if (std.mem.eql(u8, sys.name, "api")) {
+            test_mod.addImport("dashboard", dashboard_mod);
+            test_mod.addImport("naming", naming_mod);
+        }
 
         const t = b.addTest(.{
             .name = sys.name,
