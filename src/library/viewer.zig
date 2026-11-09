@@ -3,9 +3,9 @@
 
 const std = @import("std");
 const Allocator  = std.mem.Allocator;
-const TextRecord = @import("../common/schema.zig").TextRecord;
-const Catalog    = @import("catalog.zig").Catalog;
 const common     = @import("common");
+const TextRecord = common.TextRecord;
+const Catalog    = @import("catalog.zig").Catalog;
 const EntityId   = common.EntityId;
 
 // ---------------------------------------------------------------------------
