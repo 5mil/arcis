@@ -13,6 +13,7 @@
     --text: #e8e6f0;
     --muted: #9b97ab;
     --border: #2a2e38;
+    --live: #22c55e;
   }
   * { box-sizing: border-box; }
   body {
@@ -31,6 +32,19 @@
   }
   header h1 { margin: 0; font-size: 1.4rem; font-weight: 600; }
   header .tag { color: var(--accent-soft); font-size: 0.85rem; }
+  .tabs {
+    display: flex;
+    gap: 0.5rem;
+    margin-left: auto;
+  }
+  .tabs button {
+    width: auto;
+    padding: 0.4rem 0.9rem;
+    margin: 0;
+    background: transparent;
+    border: 1px solid var(--border);
+  }
+  .tabs button.active { background: var(--accent); border-color: var(--accent); }
   main {
     display: grid;
     grid-template-columns: 340px 1fr;
@@ -67,10 +81,11 @@
   }
   button:hover { background: #6a4de0; }
   button.secondary { background: transparent; border: 1px solid var(--border); }
+  button.live { background: var(--live); }
   .row { display: flex; gap: 0.5rem; }
   .row > * { flex: 1; }
-  #piano-roll {
-    height: 320px;
+  #piano-roll, #live-roll {
+    height: 280px;
     background: #12141a;
     border-radius: 8px;
     border: 1px solid var(--border);
@@ -83,13 +98,24 @@
     border-radius: 3px;
     opacity: 0.9;
   }
-  #output {
+  #output, #live-status {
     white-space: pre-wrap;
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
     font-size: 0.85rem;
     color: var(--muted);
-    max-height: 200px;
+    max-height: 160px;
     overflow: auto;
+  }
+  .hidden { display: none; }
+  .crowd-feed {
+    max-height: 120px;
+    overflow-y: auto;
+    font-size: 0.8rem;
+    color: var(--muted);
+    background: #12141a;
+    border-radius: 8px;
+    padding: 0.5rem;
+    margin-bottom: 0.75rem;
   }
   @media (max-width: 800px) {
     main { grid-template-columns: 1fr; }
@@ -100,50 +126,28 @@
 <header>
   <h1>Melos</h1>
   <span class="tag">Arcis Music Module</span>
+  <div class="tabs">
+    <button id="tab-studio" class="active">Studio</button>
+    <button id="tab-live">Live</button>
+  </div>
 </header>
 
-<main>
+<main id="studio-view">
   <div class="panel">
     <h2>Generate</h2>
     <label>Prompt</label>
     <textarea id="prompt" placeholder="Calm A-minor verse with piano and soft drums..."></textarea>
-
     <div class="row">
-      <div>
-        <label>Key</label>
-        <select id="key">
-          <option value="">Auto</option>
-          <option>C major</option><option>A minor</option>
-          <option>G major</option><option>E minor</option>
-          <option>D major</option><option>B minor</option>
-        </select>
-      </div>
-      <div>
-        <label>Tempo</label>
-        <input type="number" id="tempo" value="120" min="40" max="200">
-      </div>
+      <div><label>Key</label><select id="key"><option value="">Auto</option><option>C major</option><option>A minor</option><option>G major</option><option>E minor</option></select></div>
+      <div><label>Tempo</label><input type="number" id="tempo" value="120" min="40" max="200"></div>
     </div>
-
     <div class="row">
-      <div>
-        <label>Bars</label>
-        <input type="number" id="bars" value="8" min="1" max="64">
-      </div>
-      <div>
-        <label>Emotion</label>
-        <select id="emotion">
-          <option value="">Any</option>
-          <option>calm</option><option>energetic</option>
-          <option>happy</option><option>sad</option>
-          <option>dark</option><option>bright</option>
-        </select>
-      </div>
+      <div><label>Bars</label><input type="number" id="bars" value="8" min="1" max="64"></div>
+      <div><label>Emotion</label><select id="emotion"><option value="">Any</option><option>calm</option><option>energetic</option><option>happy</option><option>sad</option></select></div>
     </div>
-
     <button id="generate">Generate</button>
     <button class="secondary" id="analyze">Analyze last piece</button>
   </div>
-
   <div class="panel">
     <h2>Piano Roll</h2>
     <div id="piano-roll"></div>
@@ -152,11 +156,50 @@
   </div>
 </main>
 
-<script>
-const API = window.location.origin; // same origin as Arcis server
+<main id="live-view" class="hidden">
+  <div class="panel">
+    <h2>Live Performance</h2>
+    <label>Base prompt / style</label>
+    <textarea id="live-base" placeholder="Ambient dark synth, evolving pads..."></textarea>
+    <div class="row">
+      <div><label>Tempo</label><input type="number" id="live-tempo" value="96"></div>
+      <div><label>Density</label><input type="range" id="live-density" min="0" max="100" value="40"></div>
+    </div>
+    <button id="live-start" class="live">Start Live</button>
+    <button id="live-stop" class="secondary" disabled>Stop</button>
 
-function drawRoll(notes) {
-  const roll = document.getElementById('piano-roll');
+    <h2 style="margin-top:1.25rem">Crowd Modulation</h2>
+    <label>Crowd prompt (tone / mood shift)</label>
+    <input id="crowd-prompt" placeholder="make it brighter / add tension / softer">
+    <button id="crowd-send" class="secondary">Send to AI</button>
+    <div class="crowd-feed" id="crowd-feed">Waiting for crowd prompts...</div>
+  </div>
+  <div class="panel">
+    <h2>Live Piano Roll</h2>
+    <div id="live-roll"></div>
+    <h2 style="margin-top:1.25rem">Live Status</h2>
+    <div id="live-status">Idle.</div>
+  </div>
+</main>
+
+<script>
+const API = window.location.origin;
+let lastPiece = null;
+let liveTimer = null;
+let liveNotes = [];
+let liveTick = 0;
+
+function showTab(name) {
+  document.getElementById('studio-view').classList.toggle('hidden', name !== 'studio');
+  document.getElementById('live-view').classList.toggle('hidden', name !== 'live');
+  document.getElementById('tab-studio').classList.toggle('active', name === 'studio');
+  document.getElementById('tab-live').classList.toggle('active', name === 'live');
+}
+document.getElementById('tab-studio').onclick = () => showTab('studio');
+document.getElementById('tab-live').onclick = () => showTab('live');
+
+function drawRoll(containerId, notes) {
+  const roll = document.getElementById(containerId);
   roll.innerHTML = '';
   if (!notes || !notes.length) return;
   const maxTick = Math.max(...notes.map(n => n.start_tick + n.duration_ticks), 1);
@@ -177,47 +220,31 @@ function drawRoll(notes) {
   });
 }
 
-let lastPiece = null;
-
+// Studio generate
 document.getElementById('generate').onclick = async () => {
   const prompt = document.getElementById('prompt').value;
   const tempo = Number(document.getElementById('tempo').value);
   const bars = Number(document.getElementById('bars').value);
   const emotion = document.getElementById('emotion').value;
-  const key = document.getElementById('key').value;
-
   document.getElementById('output').textContent = 'Generating...';
   try {
-    // Calls Arcis agent tool endpoint (adjust path to match your router)
     const res = await fetch(API + '/api/melos/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        text: prompt,
-        attributes: {
-          tempo_bpm: tempo,
-          bars,
-          emotion: emotion || null,
-          // key parsing left simple for now
-        }
-      })
+      body: JSON.stringify({ text: prompt, attributes: { tempo_bpm: tempo, bars, emotion: emotion || null } })
     });
     const data = await res.json();
     lastPiece = data.piece || data;
     const notes = (lastPiece.tracks && lastPiece.tracks[0] && lastPiece.tracks[0].events) || [];
-    drawRoll(notes);
+    drawRoll('piano-roll', notes);
     document.getElementById('output').textContent = JSON.stringify(data, null, 2);
   } catch (e) {
-    document.getElementById('output').textContent = 'Error: ' + e.message +
-      '\n\n(Make sure Arcis is running and the /api/melos/* routes are registered.)';
+    document.getElementById('output').textContent = 'Error: ' + e.message;
   }
 };
 
 document.getElementById('analyze').onclick = async () => {
-  if (!lastPiece) {
-    document.getElementById('output').textContent = 'Generate a piece first.';
-    return;
-  }
+  if (!lastPiece) return;
   document.getElementById('output').textContent = 'Analyzing...';
   try {
     const res = await fetch(API + '/api/melos/analyze', {
@@ -225,10 +252,80 @@ document.getElementById('analyze').onclick = async () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ piece: lastPiece })
     });
-    const data = await res.json();
-    document.getElementById('output').textContent = JSON.stringify(data, null, 2);
+    document.getElementById('output').textContent = JSON.stringify(await res.json(), null, 2);
   } catch (e) {
     document.getElementById('output').textContent = 'Error: ' + e.message;
+  }
+};
+
+// Live mode
+function appendCrowd(msg) {
+  const feed = document.getElementById('crowd-feed');
+  const line = document.createElement('div');
+  line.textContent = new Date().toLocaleTimeString() + ' — ' + msg;
+  feed.prepend(line);
+}
+
+document.getElementById('live-start').onclick = () => {
+  document.getElementById('live-start').disabled = true;
+  document.getElementById('live-stop').disabled = false;
+  document.getElementById('live-status').textContent = 'Live: generating bars...';
+  liveNotes = [];
+  liveTick = 0;
+  liveTimer = setInterval(async () => {
+    // Request a short bar from the Melos generate tool, conditioned on current attributes + any crowd shifts
+    const base = document.getElementById('live-base').value;
+    const tempo = Number(document.getElementById('live-tempo').value);
+    const density = Number(document.getElementById('live-density').value) / 100;
+    try {
+      const res = await fetch(API + '/api/melos/live/step', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          base_prompt: base,
+          tempo_bpm: tempo,
+          density,
+          current_tick: liveTick
+        })
+      });
+      const data = await res.json();
+      const newNotes = data.notes || [];
+      liveNotes = liveNotes.concat(newNotes).slice(-64); // keep recent window
+      liveTick += 480 * 4; // advance one bar
+      drawRoll('live-roll', liveNotes);
+      document.getElementById('live-status').textContent =
+        'Live • bar tick ' + liveTick + ' • notes ' + liveNotes.length;
+    } catch (e) {
+      document.getElementById('live-status').textContent = 'Live error: ' + e.message;
+    }
+  }, 2000); // ~1 bar every 2s for demo; real system can be tighter
+};
+
+document.getElementById('live-stop').onclick = () => {
+  clearInterval(liveTimer);
+  document.getElementById('live-start').disabled = false;
+  document.getElementById('live-stop').disabled = true;
+  document.getElementById('live-status').textContent = 'Stopped.';
+};
+
+document.getElementById('crowd-send').onclick = async () => {
+  const prompt = document.getElementById('crowd-prompt').value.trim();
+  if (!prompt) return;
+  appendCrowd('Crowd: ' + prompt);
+  document.getElementById('crowd-prompt').value = '';
+  try {
+    const res = await fetch(API + '/api/melos/live/modulate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt })
+    });
+    const data = await res.json();
+    appendCrowd('AI: ' + (data.summary || 'modulation applied'));
+    // Optionally update local controls from returned attributes
+    if (data.tempo_bpm) document.getElementById('live-tempo').value = data.tempo_bpm;
+    if (data.density != null) document.getElementById('live-density').value = data.density * 100;
+  } catch (e) {
+    appendCrowd('Error: ' + e.message);
   }
 };
 </script>
