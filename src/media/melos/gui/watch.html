@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Melos Live — Watch</title>
+<style>
+  :root {
+    --bg: #0c0e12;
+    --panel: #161922;
+    --accent: #7c5cff;
+    --accent-soft: #a78bfa;
+    --text: #e8e6f0;
+    --muted: #9b97ab;
+    --border: #2a2e38;
+    --live: #22c55e;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+  header {
+    padding: 0.9rem 1.5rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+  header h1 { margin: 0; font-size: 1.25rem; font-weight: 600; }
+  header .tag { color: var(--accent-soft); font-size: 0.8rem; }
+  header .live-badge {
+    background: var(--live);
+    color: #000;
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    margin-left: auto;
+  }
+  .layout {
+    display: grid;
+    grid-template-columns: 1fr 380px;
+    gap: 0;
+    height: calc(100vh - 52px);
+  }
+  .stream-area {
+    background: #000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+  }
+  .stream-area iframe,
+  .stream-area video,
+  .stream-placeholder {
+    width: 100%;
+    height: 100%;
+    border: none;
+    object-fit: contain;
+  }
+  .stream-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: var(--muted);
+    text-align: center;
+    padding: 2rem;
+  }
+  .stream-placeholder code {
+    background: var(--panel);
+    padding: 0.4rem 0.7rem;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    margin-top: 0.5rem;
+  }
+  .sidebar {
+    background: var(--panel);
+    border-left: 1px solid var(--border);
+    overflow-y: auto;
+    padding: 1.25rem;
+  }
+  .sidebar h2 {
+    margin: 0 0 0.75rem;
+    font-size: 0.95rem;
+    color: var(--muted);
+    font-weight: 600;
+  }
+  label { display: block; font-size: 0.75rem; color: var(--muted); margin-bottom: 0.3rem; }
+  input, select, textarea, button {
+    width: 100%;
+    background: #12141a;
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 0.55rem 0.7rem;
+    font-size: 0.9rem;
+    margin-bottom: 0.75rem;
+  }
+  textarea { min-height: 60px; resize: vertical; }
+  button {
+    background: var(--accent);
+    border: none;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  button.secondary { background: transparent; border: 1px solid var(--border); }
+  .section { margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border); }
+  .section:last-child { border-bottom: none; }
+  .feed {
+    max-height: 120px;
+    overflow-y: auto;
+    font-size: 0.78rem;
+    color: var(--muted);
+    background: #12141a;
+    border-radius: 8px;
+    padding: 0.5rem;
+    margin-bottom: 0.5rem;
+  }
+  .pedal-item {
+    font-size: 0.8rem;
+    padding: 0.35rem 0;
+    border-bottom: 1px solid #222;
+  }
+  @media (max-width: 900px) {
+    .layout { grid-template-columns: 1fr; height: auto; }
+    .stream-area { height: 50vh; }
+    .sidebar { border-left: none; border-top: 1px solid var(--border); }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Melos Live</h1>
+  <span class="tag">Arcis Viewing Platform</span>
+  <span class="live-badge">LIVE</span>
+</header>
+
+<div class="layout">
+  <!-- Stream (Kick embed or placeholder) -->
+  <div class="stream-area">
+    <!-- Replace the placeholder with a real Kick embed when the stream is live.
+         Example Kick embed:
+         <iframe src="https://player.kick.com/YOUR_CHANNEL" allowfullscreen></iframe>
+    -->
+    <div class="stream-placeholder" id="stream-placeholder">
+      <div style="font-size:1.4rem;margin-bottom:0.5rem;">Melos Live Stream</div>
+      <div>Stream will appear here when the performer goes live on Kick.</div>
+      <code>player.kick.com/&lt;channel&gt;</code>
+      <div style="margin-top:1rem;font-size:0.8rem;">
+        Set <code>KICK_CHANNEL</code> or replace this div with the iframe.
+      </div>
+    </div>
+  </div>
+
+  <!-- Interactive sidebar -->
+  <div class="sidebar">
+    <div class="section">
+      <h2>Crowd Prompt</h2>
+      <label>Suggest a mood or change</label>
+      <input id="crowd-prompt" placeholder="make it brighter / add tension / softer pads...">
+      <button id="crowd-send">Send to Performance</button>
+      <div class="feed" id="crowd-feed">Waiting for prompts...</div>
+    </div>
+
+    <div class="section">
+      <h2>Build a Pedal</h2>
+      <label>Name</label>
+      <input id="pedal-name" placeholder="Warm Chorus">
+      <label>Instrument</label>
+      <select id="pedal-instrument">
+        <option>Piano</option>
+        <option>Synth Lead</option>
+        <option>Synth Pad</option>
+        <option>Bass</option>
+        <option>Drums</option>
+        <option>Guitar</option>
+        <option>Strings</option>
+      </select>
+      <label>Description</label>
+      <textarea id="pedal-desc" placeholder="Adds warmth and slight pitch drift..."></textarea>
+      <div style="display:flex;gap:0.5rem;">
+        <div style="flex:1">
+          <label>Pitch</label>
+          <input type="number" id="pedal-pitch" value="0" min="-12" max="12">
+        </div>
+        <div style="flex:1">
+          <label>Reverb</label>
+          <input type="range" id="pedal-reverb" min="0" max="100" value="20">
+        </div>
+      </div>
+      <button id="pedal-submit" class="secondary">Submit Pedal</button>
+    </div>
+
+    <div class="section">
+      <h2>Submitted Pedals</h2>
+      <div class="feed" id="pedal-list">None yet.</div>
+      <button class="secondary" id="pedal-refresh">Refresh</button>
+    </div>
+
+    <div class="section">
+      <h2>Quick Options</h2>
+      <label>Preferred tempo hint</label>
+      <input type="number" id="hint-tempo" value="100" min="60" max="180">
+      <label>Energy</label>
+      <select id="hint-energy">
+        <option value="">Any</option>
+        <option>low</option>
+        <option>medium</option>
+        <option>high</option>
+      </select>
+      <button class="secondary" id="hint-send">Send Hint</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = window.location.origin;
+
+// Optional: auto-embed Kick if channel is set via query or global
+const params = new URLSearchParams(window.location.search);
+const kickChannel = params.get('kick') || window.KICK_CHANNEL;
+if (kickChannel) {
+  const area = document.querySelector('.stream-area');
+  area.innerHTML = `<iframe src="https://player.kick.com/${encodeURIComponent(kickChannel)}"
+    allowfullscreen allow="autoplay" style="width:100%;height:100%;border:none;"></iframe>`;
+}
+
+function appendFeed(id, msg) {
+  const feed = document.getElementById(id);
+  const line = document.createElement('div');
+  line.textContent = new Date().toLocaleTimeString() + ' — ' + msg;
+  feed.prepend(line);
+}
+
+// Crowd prompt
+document.getElementById('crowd-send').onclick = async () => {
+  const prompt = document.getElementById('crowd-prompt').value.trim();
+  if (!prompt) return;
+  appendFeed('crowd-feed', 'You: ' + prompt);
+  document.getElementById('crowd-prompt').value = '';
+  try {
+    const res = await fetch(API + '/api/melos/live/modulate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt })
+    });
+    const data = await res.json();
+    appendFeed('crowd-feed', 'AI: ' + (data.summary || 'received'));
+  } catch (e) {
+    appendFeed('crowd-feed', 'Error: ' + e.message);
+  }
+};
+
+// Pedal submit
+document.getElementById('pedal-submit').onclick = async () => {
+  const body = {
+    name: document.getElementById('pedal-name').value || 'Untitled',
+    author: 'viewer',
+    target_instrument: document.getElementById('pedal-instrument').value,
+    description: document.getElementById('pedal-desc').value,
+    pitch_shift: Number(document.getElementById('pedal-pitch').value),
+    reverb_amount: Number(document.getElementById('pedal-reverb').value) / 100
+  };
+  try {
+    await fetch(API + '/api/melos/pedals/submit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    appendFeed('pedal-list', 'Submitted: ' + body.name);
+    refreshPedals();
+  } catch (e) {
+    alert('Submit failed: ' + e.message);
+  }
+};
+
+async function refreshPedals() {
+  try {
+    const res = await fetch(API + '/api/melos/pedals');
+    const list = await res.json();
+    const el = document.getElementById('pedal-list');
+    el.innerHTML = '';
+    (list.pedals || []).forEach(p => {
+      const d = document.createElement('div');
+      d.className = 'pedal-item';
+      d.textContent = `${p.name} → ${p.target_instrument} [${p.status}]`;
+      el.appendChild(d);
+    });
+    if (!list.pedals?.length) el.textContent = 'None yet.';
+  } catch (e) {
+    document.getElementById('pedal-list').textContent = 'Could not load.';
+  }
+}
+document.getElementById('pedal-refresh').onclick = refreshPedals;
+
+// Quick hint
+document.getElementById('hint-send').onclick = async () => {
+  const tempo = document.getElementById('hint-tempo').value;
+  const energy = document.getElementById('hint-energy').value;
+  const prompt = `hint: tempo around ${tempo}${energy ? ', energy ' + energy : ''}`;
+  try {
+    await fetch(API + '/api/melos/live/modulate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt })
+    });
+    appendFeed('crowd-feed', 'Hint sent');
+  } catch (e) {
+    appendFeed('crowd-feed', 'Error: ' + e.message);
+  }
+};
+
+// Initial load
+refreshPedals();
+</script>
+</body>
+</html>
