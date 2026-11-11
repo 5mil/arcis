@@ -6,120 +6,36 @@
 <title>Melos — Arcis Music</title>
 <style>
   :root {
-    --bg: #0f1115;
-    --panel: #1a1d24;
-    --accent: #7c5cff;
-    --accent-soft: #a78bfa;
-    --text: #e8e6f0;
-    --muted: #9b97ab;
-    --border: #2a2e38;
-    --live: #22c55e;
+    --bg: #0f1115; --panel: #1a1d24; --accent: #7c5cff; --accent-soft: #a78bfa;
+    --text: #e8e6f0; --muted: #9b97ab; --border: #2a2e38; --live: #22c55e;
   }
   * { box-sizing: border-box; }
-  body {
-    margin: 0;
-    font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    min-height: 100vh;
-  }
-  header {
-    padding: 1.25rem 2rem;
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-  }
-  header h1 { margin: 0; font-size: 1.4rem; font-weight: 600; }
+  body { margin: 0; font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); }
+  header { padding: 1.25rem 2rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 1rem; }
+  header h1 { margin: 0; font-size: 1.4rem; }
   header .tag { color: var(--accent-soft); font-size: 0.85rem; }
-  .tabs {
-    display: flex;
-    gap: 0.5rem;
-    margin-left: auto;
-  }
-  .tabs button {
-    width: auto;
-    padding: 0.4rem 0.9rem;
-    margin: 0;
-    background: transparent;
-    border: 1px solid var(--border);
-  }
+  .tabs { display: flex; gap: 0.5rem; margin-left: auto; }
+  .tabs button { width: auto; padding: 0.4rem 0.9rem; margin: 0; background: transparent; border: 1px solid var(--border); }
   .tabs button.active { background: var(--accent); border-color: var(--accent); }
-  main {
-    display: grid;
-    grid-template-columns: 340px 1fr;
-    gap: 1.5rem;
-    padding: 1.5rem 2rem;
-    max-width: 1400px;
-    margin: 0 auto;
-  }
-  .panel {
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 1.25rem;
-  }
-  h2 { margin: 0 0 1rem; font-size: 1rem; font-weight: 600; color: var(--muted); }
+  main { display: grid; grid-template-columns: 340px 1fr; gap: 1.5rem; padding: 1.5rem 2rem; max-width: 1400px; margin: 0 auto; }
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; }
+  h2 { margin: 0 0 1rem; font-size: 1rem; color: var(--muted); }
   label { display: block; font-size: 0.8rem; color: var(--muted); margin-bottom: 0.35rem; }
   input, select, textarea, button {
-    width: 100%;
-    background: #12141a;
-    border: 1px solid var(--border);
-    color: var(--text);
-    border-radius: 8px;
-    padding: 0.6rem 0.75rem;
-    font-size: 0.95rem;
-    margin-bottom: 0.85rem;
+    width: 100%; background: #12141a; border: 1px solid var(--border); color: var(--text);
+    border-radius: 8px; padding: 0.6rem 0.75rem; font-size: 0.95rem; margin-bottom: 0.85rem;
   }
-  textarea { min-height: 90px; resize: vertical; }
-  button {
-    background: var(--accent);
-    border: none;
-    font-weight: 600;
-    cursor: pointer;
-    transition: background 0.15s;
-  }
-  button:hover { background: #6a4de0; }
+  textarea { min-height: 70px; resize: vertical; }
+  button { background: var(--accent); border: none; font-weight: 600; cursor: pointer; }
   button.secondary { background: transparent; border: 1px solid var(--border); }
   button.live { background: var(--live); }
-  .row { display: flex; gap: 0.5rem; }
-  .row > * { flex: 1; }
-  #piano-roll, #live-roll {
-    height: 280px;
-    background: #12141a;
-    border-radius: 8px;
-    border: 1px solid var(--border);
-    position: relative;
-    overflow: hidden;
-  }
-  .note-bar {
-    position: absolute;
-    background: var(--accent);
-    border-radius: 3px;
-    opacity: 0.9;
-  }
-  #output, #live-status {
-    white-space: pre-wrap;
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 0.85rem;
-    color: var(--muted);
-    max-height: 160px;
-    overflow: auto;
-  }
+  .row { display: flex; gap: 0.5rem; } .row > * { flex: 1; }
+  #piano-roll, #live-roll { height: 240px; background: #12141a; border-radius: 8px; border: 1px solid var(--border); position: relative; overflow: hidden; }
+  .note-bar { position: absolute; background: var(--accent); border-radius: 3px; opacity: 0.9; }
+  #output, #live-status { white-space: pre-wrap; font-family: ui-monospace, monospace; font-size: 0.85rem; color: var(--muted); max-height: 140px; overflow: auto; }
   .hidden { display: none; }
-  .crowd-feed {
-    max-height: 120px;
-    overflow-y: auto;
-    font-size: 0.8rem;
-    color: var(--muted);
-    background: #12141a;
-    border-radius: 8px;
-    padding: 0.5rem;
-    margin-bottom: 0.75rem;
-  }
-  @media (max-width: 800px) {
-    main { grid-template-columns: 1fr; }
-  }
+  .crowd-feed, .pedal-list { max-height: 140px; overflow-y: auto; font-size: 0.8rem; color: var(--muted); background: #12141a; border-radius: 8px; padding: 0.5rem; margin-bottom: 0.75rem; }
+  @media (max-width: 800px) { main { grid-template-columns: 1fr; } }
 </style>
 </head>
 <body>
@@ -129,205 +45,216 @@
   <div class="tabs">
     <button id="tab-studio" class="active">Studio</button>
     <button id="tab-live">Live</button>
+    <button id="tab-pedals">Pedals</button>
   </div>
 </header>
 
 <main id="studio-view">
   <div class="panel">
     <h2>Generate</h2>
-    <label>Prompt</label>
-    <textarea id="prompt" placeholder="Calm A-minor verse with piano and soft drums..."></textarea>
+    <label>Prompt</label><textarea id="prompt" placeholder="Calm A-minor verse..."></textarea>
     <div class="row">
-      <div><label>Key</label><select id="key"><option value="">Auto</option><option>C major</option><option>A minor</option><option>G major</option><option>E minor</option></select></div>
-      <div><label>Tempo</label><input type="number" id="tempo" value="120" min="40" max="200"></div>
+      <div><label>Key</label><select id="key"><option value="">Auto</option><option>C major</option><option>A minor</option></select></div>
+      <div><label>Tempo</label><input type="number" id="tempo" value="120"></div>
     </div>
     <div class="row">
-      <div><label>Bars</label><input type="number" id="bars" value="8" min="1" max="64"></div>
-      <div><label>Emotion</label><select id="emotion"><option value="">Any</option><option>calm</option><option>energetic</option><option>happy</option><option>sad</option></select></div>
+      <div><label>Bars</label><input type="number" id="bars" value="8"></div>
+      <div><label>Emotion</label><select id="emotion"><option value="">Any</option><option>calm</option><option>energetic</option></select></div>
     </div>
     <button id="generate">Generate</button>
-    <button class="secondary" id="analyze">Analyze last piece</button>
+    <button class="secondary" id="analyze">Analyze</button>
   </div>
   <div class="panel">
-    <h2>Piano Roll</h2>
-    <div id="piano-roll"></div>
-    <h2 style="margin-top:1.25rem">Result</h2>
-    <div id="output">Ready.</div>
+    <h2>Piano Roll</h2><div id="piano-roll"></div>
+    <h2 style="margin-top:1rem">Result</h2><div id="output">Ready.</div>
   </div>
 </main>
 
 <main id="live-view" class="hidden">
   <div class="panel">
     <h2>Live Performance</h2>
-    <label>Base prompt / style</label>
-    <textarea id="live-base" placeholder="Ambient dark synth, evolving pads..."></textarea>
+    <label>Base prompt</label><textarea id="live-base" placeholder="Ambient dark synth..."></textarea>
     <div class="row">
       <div><label>Tempo</label><input type="number" id="live-tempo" value="96"></div>
       <div><label>Density</label><input type="range" id="live-density" min="0" max="100" value="40"></div>
     </div>
     <button id="live-start" class="live">Start Live</button>
     <button id="live-stop" class="secondary" disabled>Stop</button>
-
-    <h2 style="margin-top:1.25rem">Crowd Modulation</h2>
-    <label>Crowd prompt (tone / mood shift)</label>
-    <input id="crowd-prompt" placeholder="make it brighter / add tension / softer">
-    <button id="crowd-send" class="secondary">Send to AI</button>
-    <div class="crowd-feed" id="crowd-feed">Waiting for crowd prompts...</div>
+    <h2 style="margin-top:1rem">Crowd Modulation</h2>
+    <input id="crowd-prompt" placeholder="make it brighter / softer...">
+    <button id="crowd-send" class="secondary">Send</button>
+    <div class="crowd-feed" id="crowd-feed">Waiting...</div>
   </div>
   <div class="panel">
-    <h2>Live Piano Roll</h2>
-    <div id="live-roll"></div>
-    <h2 style="margin-top:1.25rem">Live Status</h2>
-    <div id="live-status">Idle.</div>
+    <h2>Live Piano Roll</h2><div id="live-roll"></div>
+    <h2 style="margin-top:1rem">Status</h2><div id="live-status">Idle.</div>
+  </div>
+</main>
+
+<main id="pedals-view" class="hidden">
+  <div class="panel">
+    <h2>Build a Pedal</h2>
+    <label>Pedal name</label><input id="pedal-name" placeholder="Warm Chorus">
+    <label>Target instrument</label>
+    <select id="pedal-instrument">
+      <option>Piano</option><option>Synth Lead</option><option>Synth Pad</option>
+      <option>Bass</option><option>Drums</option><option>Guitar</option><option>Strings</option>
+    </select>
+    <label>Description</label><textarea id="pedal-desc" placeholder="Adds warmth and slight pitch drift..."></textarea>
+    <div class="row">
+      <div><label>Pitch shift</label><input type="number" id="pedal-pitch" value="0" min="-12" max="12"></div>
+      <div><label>Velocity scale</label><input type="number" id="pedal-vel" value="1.0" step="0.1" min="0.1" max="2"></div>
+    </div>
+    <div class="row">
+      <div><label>Reverb</label><input type="range" id="pedal-reverb" min="0" max="100" value="0"></div>
+      <div><label>Delay (ticks)</label><input type="number" id="pedal-delay" value="0"></div>
+    </div>
+    <button id="pedal-submit">Submit Pedal</button>
+  </div>
+  <div class="panel">
+    <h2>Submitted Pedals</h2>
+    <div class="pedal-list" id="pedal-list">None yet.</div>
+    <button class="secondary" id="pedal-refresh">Refresh</button>
+    <p style="font-size:0.8rem;color:var(--muted)">Performer can approve / activate from the live session.</p>
   </div>
 </main>
 
 <script>
 const API = window.location.origin;
-let lastPiece = null;
-let liveTimer = null;
-let liveNotes = [];
-let liveTick = 0;
+let lastPiece = null, liveTimer = null, liveNotes = [], liveTick = 0;
 
 function showTab(name) {
-  document.getElementById('studio-view').classList.toggle('hidden', name !== 'studio');
-  document.getElementById('live-view').classList.toggle('hidden', name !== 'live');
-  document.getElementById('tab-studio').classList.toggle('active', name === 'studio');
-  document.getElementById('tab-live').classList.toggle('active', name === 'live');
+  ['studio','live','pedals'].forEach(t => {
+    document.getElementById(t+'-view').classList.toggle('hidden', t !== name);
+    document.getElementById('tab-'+t).classList.toggle('active', t === name);
+  });
 }
 document.getElementById('tab-studio').onclick = () => showTab('studio');
 document.getElementById('tab-live').onclick = () => showTab('live');
+document.getElementById('tab-pedals').onclick = () => showTab('pedals');
 
-function drawRoll(containerId, notes) {
-  const roll = document.getElementById(containerId);
-  roll.innerHTML = '';
-  if (!notes || !notes.length) return;
+function drawRoll(id, notes) {
+  const roll = document.getElementById(id); roll.innerHTML = '';
+  if (!notes?.length) return;
   const maxTick = Math.max(...notes.map(n => n.start_tick + n.duration_ticks), 1);
-  const minPitch = Math.min(...notes.map(n => n.pitch));
-  const maxPitch = Math.max(...notes.map(n => n.pitch));
-  const range = Math.max(maxPitch - minPitch, 1);
+  const minP = Math.min(...notes.map(n => n.pitch)), maxP = Math.max(...notes.map(n => n.pitch));
+  const range = Math.max(maxP - minP, 1);
   notes.forEach(n => {
-    const bar = document.createElement('div');
-    bar.className = 'note-bar';
-    const left = (n.start_tick / maxTick) * 100;
-    const width = (n.duration_ticks / maxTick) * 100;
-    const top = ((maxPitch - n.pitch) / range) * 100;
-    bar.style.left = left + '%';
-    bar.style.width = Math.max(width, 0.8) + '%';
-    bar.style.top = top + '%';
+    const bar = document.createElement('div'); bar.className = 'note-bar';
+    bar.style.left = (n.start_tick / maxTick * 100) + '%';
+    bar.style.width = Math.max(n.duration_ticks / maxTick * 100, 0.8) + '%';
+    bar.style.top = ((maxP - n.pitch) / range * 100) + '%';
     bar.style.height = '8%';
     roll.appendChild(bar);
   });
 }
 
-// Studio generate
+// Studio
 document.getElementById('generate').onclick = async () => {
-  const prompt = document.getElementById('prompt').value;
-  const tempo = Number(document.getElementById('tempo').value);
-  const bars = Number(document.getElementById('bars').value);
-  const emotion = document.getElementById('emotion').value;
+  const body = {
+    text: document.getElementById('prompt').value,
+    attributes: {
+      tempo_bpm: +document.getElementById('tempo').value,
+      bars: +document.getElementById('bars').value,
+      emotion: document.getElementById('emotion').value || null
+    }
+  };
   document.getElementById('output').textContent = 'Generating...';
   try {
-    const res = await fetch(API + '/api/melos/generate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: prompt, attributes: { tempo_bpm: tempo, bars, emotion: emotion || null } })
-    });
+    const res = await fetch(API + '/api/melos/generate', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
     const data = await res.json();
     lastPiece = data.piece || data;
-    const notes = (lastPiece.tracks && lastPiece.tracks[0] && lastPiece.tracks[0].events) || [];
-    drawRoll('piano-roll', notes);
+    drawRoll('piano-roll', lastPiece.tracks?.[0]?.events || []);
     document.getElementById('output').textContent = JSON.stringify(data, null, 2);
-  } catch (e) {
-    document.getElementById('output').textContent = 'Error: ' + e.message;
-  }
+  } catch(e) { document.getElementById('output').textContent = 'Error: ' + e.message; }
 };
-
 document.getElementById('analyze').onclick = async () => {
   if (!lastPiece) return;
-  document.getElementById('output').textContent = 'Analyzing...';
   try {
-    const res = await fetch(API + '/api/melos/analyze', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ piece: lastPiece })
-    });
+    const res = await fetch(API + '/api/melos/analyze', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({piece:lastPiece}) });
     document.getElementById('output').textContent = JSON.stringify(await res.json(), null, 2);
-  } catch (e) {
-    document.getElementById('output').textContent = 'Error: ' + e.message;
-  }
+  } catch(e) { document.getElementById('output').textContent = 'Error: ' + e.message; }
 };
 
-// Live mode
+// Live
 function appendCrowd(msg) {
   const feed = document.getElementById('crowd-feed');
-  const line = document.createElement('div');
-  line.textContent = new Date().toLocaleTimeString() + ' — ' + msg;
-  feed.prepend(line);
+  const d = document.createElement('div'); d.textContent = new Date().toLocaleTimeString() + ' — ' + msg;
+  feed.prepend(d);
 }
-
 document.getElementById('live-start').onclick = () => {
   document.getElementById('live-start').disabled = true;
   document.getElementById('live-stop').disabled = false;
-  document.getElementById('live-status').textContent = 'Live: generating bars...';
-  liveNotes = [];
-  liveTick = 0;
+  liveNotes = []; liveTick = 0;
   liveTimer = setInterval(async () => {
-    // Request a short bar from the Melos generate tool, conditioned on current attributes + any crowd shifts
-    const base = document.getElementById('live-base').value;
-    const tempo = Number(document.getElementById('live-tempo').value);
-    const density = Number(document.getElementById('live-density').value) / 100;
     try {
       const res = await fetch(API + '/api/melos/live/step', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method:'POST', headers:{'Content-Type':'application/json'},
         body: JSON.stringify({
-          base_prompt: base,
-          tempo_bpm: tempo,
-          density,
+          base_prompt: document.getElementById('live-base').value,
+          tempo_bpm: +document.getElementById('live-tempo').value,
+          density: document.getElementById('live-density').value / 100,
           current_tick: liveTick
         })
       });
       const data = await res.json();
-      const newNotes = data.notes || [];
-      liveNotes = liveNotes.concat(newNotes).slice(-64); // keep recent window
-      liveTick += 480 * 4; // advance one bar
+      liveNotes = liveNotes.concat(data.notes || []).slice(-64);
+      liveTick += 1920;
       drawRoll('live-roll', liveNotes);
-      document.getElementById('live-status').textContent =
-        'Live • bar tick ' + liveTick + ' • notes ' + liveNotes.length;
-    } catch (e) {
-      document.getElementById('live-status').textContent = 'Live error: ' + e.message;
-    }
-  }, 2000); // ~1 bar every 2s for demo; real system can be tighter
+      document.getElementById('live-status').textContent = 'Live • tick ' + liveTick;
+    } catch(e) { document.getElementById('live-status').textContent = 'Error: ' + e.message; }
+  }, 2000);
 };
-
 document.getElementById('live-stop').onclick = () => {
   clearInterval(liveTimer);
   document.getElementById('live-start').disabled = false;
   document.getElementById('live-stop').disabled = true;
   document.getElementById('live-status').textContent = 'Stopped.';
 };
-
 document.getElementById('crowd-send').onclick = async () => {
-  const prompt = document.getElementById('crowd-prompt').value.trim();
-  if (!prompt) return;
-  appendCrowd('Crowd: ' + prompt);
+  const p = document.getElementById('crowd-prompt').value.trim();
+  if (!p) return;
+  appendCrowd('Crowd: ' + p);
   document.getElementById('crowd-prompt').value = '';
   try {
-    const res = await fetch(API + '/api/melos/live/modulate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt })
-    });
+    const res = await fetch(API + '/api/melos/live/modulate', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({prompt:p}) });
     const data = await res.json();
-    appendCrowd('AI: ' + (data.summary || 'modulation applied'));
-    // Optionally update local controls from returned attributes
-    if (data.tempo_bpm) document.getElementById('live-tempo').value = data.tempo_bpm;
-    if (data.density != null) document.getElementById('live-density').value = data.density * 100;
-  } catch (e) {
-    appendCrowd('Error: ' + e.message);
-  }
+    appendCrowd('AI: ' + (data.summary || 'applied'));
+  } catch(e) { appendCrowd('Error: ' + e.message); }
 };
+
+// Pedals
+async function refreshPedals() {
+  try {
+    const res = await fetch(API + '/api/melos/pedals');
+    const list = await res.json();
+    const el = document.getElementById('pedal-list');
+    el.innerHTML = '';
+    (list.pedals || []).forEach(p => {
+      const d = document.createElement('div');
+      d.textContent = `${p.name} → ${p.target_instrument} [${p.status}] by ${p.author}`;
+      el.appendChild(d);
+    });
+    if (!list.pedals?.length) el.textContent = 'None yet.';
+  } catch(e) { document.getElementById('pedal-list').textContent = 'Error loading.'; }
+}
+document.getElementById('pedal-submit').onclick = async () => {
+  const body = {
+    name: document.getElementById('pedal-name').value,
+    author: 'crowd',
+    target_instrument: document.getElementById('pedal-instrument').value,
+    description: document.getElementById('pedal-desc').value,
+    pitch_shift: +document.getElementById('pedal-pitch').value,
+    velocity_scale: +document.getElementById('pedal-vel').value,
+    reverb_amount: document.getElementById('pedal-reverb').value / 100,
+    delay_ticks: +document.getElementById('pedal-delay').value
+  };
+  try {
+    await fetch(API + '/api/melos/pedals/submit', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    refreshPedals();
+  } catch(e) { alert('Submit failed: ' + e.message); }
+};
+document.getElementById('pedal-refresh').onclick = refreshPedals;
 </script>
 </body>
 </html>
