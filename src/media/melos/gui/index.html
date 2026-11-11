@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Melos — Arcis Music</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #1a1d24;
+    --accent: #7c5cff;
+    --accent-soft: #a78bfa;
+    --text: #e8e6f0;
+    --muted: #9b97ab;
+    --border: #2a2e38;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+  header {
+    padding: 1.25rem 2rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+  header h1 { margin: 0; font-size: 1.4rem; font-weight: 600; }
+  header .tag { color: var(--accent-soft); font-size: 0.85rem; }
+  main {
+    display: grid;
+    grid-template-columns: 340px 1fr;
+    gap: 1.5rem;
+    padding: 1.5rem 2rem;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.25rem;
+  }
+  h2 { margin: 0 0 1rem; font-size: 1rem; font-weight: 600; color: var(--muted); }
+  label { display: block; font-size: 0.8rem; color: var(--muted); margin-bottom: 0.35rem; }
+  input, select, textarea, button {
+    width: 100%;
+    background: #12141a;
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 0.6rem 0.75rem;
+    font-size: 0.95rem;
+    margin-bottom: 0.85rem;
+  }
+  textarea { min-height: 90px; resize: vertical; }
+  button {
+    background: var(--accent);
+    border: none;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  button:hover { background: #6a4de0; }
+  button.secondary { background: transparent; border: 1px solid var(--border); }
+  .row { display: flex; gap: 0.5rem; }
+  .row > * { flex: 1; }
+  #piano-roll {
+    height: 320px;
+    background: #12141a;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    position: relative;
+    overflow: hidden;
+  }
+  .note-bar {
+    position: absolute;
+    background: var(--accent);
+    border-radius: 3px;
+    opacity: 0.9;
+  }
+  #output {
+    white-space: pre-wrap;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.85rem;
+    color: var(--muted);
+    max-height: 200px;
+    overflow: auto;
+  }
+  @media (max-width: 800px) {
+    main { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Melos</h1>
+  <span class="tag">Arcis Music Module</span>
+</header>
+
+<main>
+  <div class="panel">
+    <h2>Generate</h2>
+    <label>Prompt</label>
+    <textarea id="prompt" placeholder="Calm A-minor verse with piano and soft drums..."></textarea>
+
+    <div class="row">
+      <div>
+        <label>Key</label>
+        <select id="key">
+          <option value="">Auto</option>
+          <option>C major</option><option>A minor</option>
+          <option>G major</option><option>E minor</option>
+          <option>D major</option><option>B minor</option>
+        </select>
+      </div>
+      <div>
+        <label>Tempo</label>
+        <input type="number" id="tempo" value="120" min="40" max="200">
+      </div>
+    </div>
+
+    <div class="row">
+      <div>
+        <label>Bars</label>
+        <input type="number" id="bars" value="8" min="1" max="64">
+      </div>
+      <div>
+        <label>Emotion</label>
+        <select id="emotion">
+          <option value="">Any</option>
+          <option>calm</option><option>energetic</option>
+          <option>happy</option><option>sad</option>
+          <option>dark</option><option>bright</option>
+        </select>
+      </div>
+    </div>
+
+    <button id="generate">Generate</button>
+    <button class="secondary" id="analyze">Analyze last piece</button>
+  </div>
+
+  <div class="panel">
+    <h2>Piano Roll</h2>
+    <div id="piano-roll"></div>
+    <h2 style="margin-top:1.25rem">Result</h2>
+    <div id="output">Ready.</div>
+  </div>
+</main>
+
+<script>
+const API = window.location.origin; // same origin as Arcis server
+
+function drawRoll(notes) {
+  const roll = document.getElementById('piano-roll');
+  roll.innerHTML = '';
+  if (!notes || !notes.length) return;
+  const maxTick = Math.max(...notes.map(n => n.start_tick + n.duration_ticks), 1);
+  const minPitch = Math.min(...notes.map(n => n.pitch));
+  const maxPitch = Math.max(...notes.map(n => n.pitch));
+  const range = Math.max(maxPitch - minPitch, 1);
+  notes.forEach(n => {
+    const bar = document.createElement('div');
+    bar.className = 'note-bar';
+    const left = (n.start_tick / maxTick) * 100;
+    const width = (n.duration_ticks / maxTick) * 100;
+    const top = ((maxPitch - n.pitch) / range) * 100;
+    bar.style.left = left + '%';
+    bar.style.width = Math.max(width, 0.8) + '%';
+    bar.style.top = top + '%';
+    bar.style.height = '8%';
+    roll.appendChild(bar);
+  });
+}
+
+let lastPiece = null;
+
+document.getElementById('generate').onclick = async () => {
+  const prompt = document.getElementById('prompt').value;
+  const tempo = Number(document.getElementById('tempo').value);
+  const bars = Number(document.getElementById('bars').value);
+  const emotion = document.getElementById('emotion').value;
+  const key = document.getElementById('key').value;
+
+  document.getElementById('output').textContent = 'Generating...';
+  try {
+    // Calls Arcis agent tool endpoint (adjust path to match your router)
+    const res = await fetch(API + '/api/melos/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        text: prompt,
+        attributes: {
+          tempo_bpm: tempo,
+          bars,
+          emotion: emotion || null,
+          // key parsing left simple for now
+        }
+      })
+    });
+    const data = await res.json();
+    lastPiece = data.piece || data;
+    const notes = (lastPiece.tracks && lastPiece.tracks[0] && lastPiece.tracks[0].events) || [];
+    drawRoll(notes);
+    document.getElementById('output').textContent = JSON.stringify(data, null, 2);
+  } catch (e) {
+    document.getElementById('output').textContent = 'Error: ' + e.message +
+      '\n\n(Make sure Arcis is running and the /api/melos/* routes are registered.)';
+  }
+};
+
+document.getElementById('analyze').onclick = async () => {
+  if (!lastPiece) {
+    document.getElementById('output').textContent = 'Generate a piece first.';
+    return;
+  }
+  document.getElementById('output').textContent = 'Analyzing...';
+  try {
+    const res = await fetch(API + '/api/melos/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ piece: lastPiece })
+    });
+    const data = await res.json();
+    document.getElementById('output').textContent = JSON.stringify(data, null, 2);
+  } catch (e) {
+    document.getElementById('output').textContent = 'Error: ' + e.message;
+  }
+};
+</script>
+</body>
+</html>
