@@ -104,7 +104,6 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
-    exe_mod.addImport("common", common_mod);
 
     const exe = b.addExecutable(.{
         .name = "arcis",

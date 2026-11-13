@@ -52,7 +52,7 @@ pub fn main() !void {
     }
 
     var dispatcher = TierDispatcher.init(allocator, &session, tier);
-    var srv = Server.init(allocator, &dispatcher, .{ .port = port });
+    var srv = Server.init(allocator, &dispatcher, .{ .port = port, .host = "127.0.0.1" });
 
     std.log.info("Routes: / /health /infer /rag /search", .{});
     try srv.serve();
