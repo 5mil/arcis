@@ -75,4 +75,34 @@ pub fn main() !void {
     }
     metrics.printStats("NEW  live 16 steps (vs its own key)", agg2, sets);
     std.debug.print("NEW  live: unique step pitch-sequences = {d:.1}/16, last note start_tick={d} (monotonic bars)\n", .{ @as(f64, @floatFromInt(uniq_total)) / @as(f64, @floatFromInt(sets)), last_tick_max });
+
+    // Stage 3: effect of crowd prompts on 16 settled bars (avg over 20 sets).
+    const prompts = [_]?[]const u8{ null, "busy and frantic, so dense", "sparse minimal and simple", "loud epic energetic", "soft whisper gentle", "faster", "slower", "higher higher sky", "lower deeper" };
+    for (prompts) |pr| {
+        var notes: usize = 0;
+        var vel: f64 = 0;
+        var pitch: f64 = 0;
+        var tempo: f64 = 0;
+        var bars: usize = 0;
+        var sd: u64 = 1;
+        while (sd <= 20) : (sd += 1) {
+            var st = live.LiveState.init(sd, null, .{ .key = .{ .tonic = 0, .mode = .major } });
+            var bo = generate.BarOut{};
+            var ap = live.Applied{};
+            if (pr) |p| live.applyPrompt(&st.tgt, p, &ap);
+            for (0..32) |i| {
+                _ = st.step(&bo);
+                if (i < 16) continue;
+                bars += 1;
+                notes += bo.mel_n;
+                tempo += st.comp.p.tempo_bpm;
+                for (bo.melody[0..bo.mel_n]) |nt| {
+                    vel += @floatFromInt(nt.velocity);
+                    pitch += @floatFromInt(nt.pitch);
+                }
+            }
+        }
+        const nn: f64 = @floatFromInt(notes);
+        std.debug.print("MOD  {s:<28} melody notes/bar={d:.1} vel={d:.1} mean-pitch={d:.1} tempo={d:.0}\n", .{ pr orelse "(baseline)", @as(f64, @floatFromInt(notes)) / @as(f64, @floatFromInt(bars)), vel / nn, pitch / nn, tempo / @as(f64, @floatFromInt(bars)) });
+    }
 }
