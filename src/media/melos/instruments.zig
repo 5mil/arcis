@@ -24,6 +24,7 @@ pub const instruments = [_]Instrument{
     .{ .name = "Strings",      .role = .pad,           .gm_program = 48 },
     .{ .name = "Flute",        .role = .melody,        .gm_program = 73 },
     .{ .name = "Choir",        .role = .pad,           .gm_program = 52 },
+    .{ .name = "Vocal",        .role = .melody,        .gm_program = 54 }, // Voice Oohs as placeholder; real render via official bridge
 };
 
 pub fn findByName(name: []const u8) ?Instrument {
