@@ -75,6 +75,7 @@ export function lyricsDocument(song: Song) {
   const lines = [
     `Melos vocal packet`,
     `Engine: ${song.vocalEngine}`,
+    `Test bank: ${song.voicebank ?? "lamp"}`,
     `Title: ${song.title}`,
     `Tempo: ${song.bpm}`,
     `Key: tonic ${song.tonic} ${song.mode}`,

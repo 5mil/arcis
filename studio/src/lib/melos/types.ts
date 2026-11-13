@@ -129,6 +129,7 @@ export type Song = {
   pedals: Pedal[];
   prompts: PromptEvent[];
   vocalEngine: VocalEngine;
+  voicebank: string;
   kickChannel: string;
 };
 

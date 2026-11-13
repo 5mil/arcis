@@ -126,7 +126,7 @@ export function exportPacket() {
   downloadBlob(lyrics, `${song.title}-lyrics.txt`);
   const vocal = vocalTrack(song);
   const json = new Blob(
-    [JSON.stringify({ engine: song.vocalEngine, expression: vocal?.expression ?? null, title: song.title }, null, 2)],
+    [JSON.stringify({ engine: song.vocalEngine, voicebank: song.voicebank, expression: vocal?.expression ?? null, title: song.title }, null, 2)],
     { type: "application/json" },
   );
   downloadBlob(json, `${song.title}-expression.json`);

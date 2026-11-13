@@ -12,6 +12,8 @@ This is not the older static page at `www.fizz.beer/melos/` (Melos Live watch: K
 - **Wave** — destructive edit: cut, copy, paste, trim, fades, reverse, normalize, echo, EQ, denoise, de-click, pitch, speed, spectrum, markers
 - **Live** — crowd prompts, audience pedals, Kick channel embed, session packet for a licensed vocal editor
 
+The in-browser voice uses four original free test banks (Lamp, Reed, Glass, Clay) so vowels can be heard. They are not purchased voicebanks.
+
 The in-browser voice is Melos's own preview model. Purchased VOCALOID, Synthesizer V, ACE, and Emvoice banks are not included. Use **Download session packet** (MIDI + lyrics + expression JSON) in a editor you already own.
 
 Song state stays in the browser (`localStorage`). No accounts.

@@ -3,6 +3,7 @@ import { getMeter } from "@/lib/melos/engine";
 import { exportPacket } from "@/lib/melos/commands";
 import { useMelos } from "@/lib/melos/store";
 import type { TrackKind, VocalEngine } from "@/lib/melos/types";
+import { TEST_BANKS, voicebank } from "@/lib/melos/voicebanks";
 import { Slider } from "./Studio";
 
 const ENGINES: { id: VocalEngine; label: string; hint: string }[] = [
@@ -102,6 +103,25 @@ export function LiveView() {
               </div>
             </div>
           ))}
+        </div>
+        <div className="panel stack">
+          <h3>Free test banks</h3>
+          <p className="mist">Original Melos timbres so you can hear vowels before a purchased bank. These are not VOCALOID, Synthesizer V, ACE, or Emvoice.</p>
+          <div className="row">
+            {TEST_BANKS.map((bank) => (
+              <button
+                key={bank.id}
+                className={`btn ${voicebank(song.voicebank).id === bank.id ? "btn-on" : ""}`}
+                onClick={() => {
+                  useMelos.getState().patchSong({ voicebank: bank.id });
+                  useMelos.getState().setStatus(`${bank.name} test bank`);
+                }}
+              >
+                {bank.name}
+              </button>
+            ))}
+          </div>
+          <p className="mist">{voicebank(song.voicebank).credit}</p>
         </div>
         <div className="panel stack">
           <h3>Licensed voicebanks</h3>

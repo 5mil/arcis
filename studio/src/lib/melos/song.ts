@@ -142,6 +142,7 @@ export function createSong(): Song {
     structureAware: true,
     master: 0.86,
     vocalEngine: "vocaloid",
+    voicebank: "lamp",
     kickChannel: "",
     sections: [
       { id: "sec-verse", name: "Verse", start: 0, bars: 4 },
