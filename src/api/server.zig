@@ -14,6 +14,14 @@ pub const ServerConfig = struct {
     backlog: u31     = 128,
 };
 
+/// Hard limits: bounded request size, bounded concurrency, read timeout.
+const MAX_REQ: usize = 8192;
+const MAX_BODY: usize = 6144;
+const MAX_CONNS: u32 = 24;
+const READ_TIMEOUT_SEC: i64 = 5;
+const THREAD_STACK: usize = 512 * 1024;
+var g_active = std.atomic.Value(u32).init(0);
+
 pub const Method = enum { GET, POST, DELETE, UNKNOWN };
 
 pub const Request = struct {
@@ -55,11 +63,31 @@ pub const Server = struct {
         std.log.info("Arcis listening on {s}:{d}", .{ self.config.host, self.config.port });
 
         while (true) {
-            const conn = try listener.accept();
-            // Spawn a detached thread per connection.
-            const ctx = try self.allocator.create(ConnContext);
+            const conn = listener.accept() catch |err| {
+                std.log.err("accept failed: {}", .{err});
+                std.time.sleep(50 * std.time.ns_per_ms);
+                continue;
+            };
+            // Shed load instead of growing without bound.
+            if (g_active.load(.monotonic) >= MAX_CONNS) {
+                conn.stream.close();
+                continue;
+            }
+            const tv = std.posix.timeval{ .sec = READ_TIMEOUT_SEC, .usec = 0 };
+            std.posix.setsockopt(conn.stream.handle, std.posix.SOL.SOCKET, std.posix.SO.RCVTIMEO, std.mem.asBytes(&tv)) catch {};
+            const ctx = self.allocator.create(ConnContext) catch {
+                conn.stream.close();
+                continue;
+            };
             ctx.* = .{ .conn = conn, .server = self };
-            const t = try std.Thread.spawn(.{}, handleConn, .{ctx});
+            _ = g_active.fetchAdd(1, .monotonic);
+            // Detached thread per connection with a small stack.
+            const t = std.Thread.spawn(.{ .stack_size = THREAD_STACK }, handleConn, .{ctx}) catch {
+                _ = g_active.fetchSub(1, .monotonic);
+                self.allocator.destroy(ctx);
+                conn.stream.close();
+                continue;
+            };
             t.detach();
         }
     }
@@ -71,6 +99,7 @@ const ConnContext = struct {
 };
 
 fn handleConn(ctx: *ConnContext) void {
+    defer _ = g_active.fetchSub(1, .monotonic);
     defer ctx.server.allocator.destroy(ctx);
     defer ctx.conn.stream.close();
     serveConn(ctx) catch |err| {
@@ -80,10 +109,26 @@ fn handleConn(ctx: *ConnContext) void {
 
 fn serveConn(ctx: *ConnContext) !void {
     const allocator = ctx.server.allocator;
-    var buf: [4096]u8 = undefined;
-    const n = try ctx.conn.stream.read(&buf);
-    if (n == 0) return;
-    const raw = buf[0..n];
+    var buf: [MAX_REQ]u8 = undefined;
+    var total: usize = 0;
+    var header_end: ?usize = null;
+    var content_len: usize = 0;
+    while (true) {
+        if (total == buf.len) return sendStatus(ctx, 413, "request too large");
+        const n = try ctx.conn.stream.read(buf[total..]);
+        if (n == 0) break;
+        total += n;
+        if (header_end == null) {
+            if (std.mem.indexOf(u8, buf[0..total], "\r\n\r\n")) |idx| {
+                header_end = idx + 4;
+                content_len = parseContentLength(buf[0..idx]);
+                if (content_len > MAX_BODY) return sendStatus(ctx, 413, "request too large");
+            }
+        }
+        if (header_end) |he| if (total >= he + content_len) break;
+    }
+    if (total == 0) return;
+    const raw = buf[0..total];
 
     // Parse request line: "METHOD /path HTTP/1.1\r\n"
     var lines = std.mem.splitSequence(u8, raw, "\r\n");
@@ -97,9 +142,9 @@ fn serveConn(ctx: *ConnContext) !void {
         else if (std.mem.eql(u8, method_str, "DELETE")) .DELETE
         else .UNKNOWN;
 
-    // Extract body (after double CRLF).
-    const body = if (std.mem.indexOf(u8, raw, "\r\n\r\n")) |idx|
-        try allocator.dupe(u8, raw[idx + 4 ..])
+    // Extract body (after double CRLF), never more than Content-Length.
+    const body = if (header_end) |he|
+        try allocator.dupe(u8, raw[he..@min(raw.len, he + content_len)])
     else
         try allocator.dupe(u8, "");
 
@@ -129,4 +174,25 @@ fn serveConn(ctx: *ConnContext) !void {
     defer allocator.free(header);
     try ctx.conn.stream.writeAll(header);
     try ctx.conn.stream.writeAll(resp.body);
+}
+
+fn parseContentLength(headers: []const u8) usize {
+    var it = std.mem.splitSequence(u8, headers, "\r\n");
+    _ = it.next(); // request line
+    while (it.next()) |line| {
+        if (line.len < 15) continue;
+        if (!std.ascii.eqlIgnoreCase(line[0..15], "content-length:")) continue;
+        const v = std.mem.trim(u8, line[15..], " \t");
+        return std.fmt.parseInt(usize, v, 10) catch 0;
+    }
+    return 0;
+}
+
+fn sendStatus(ctx: *ConnContext, status: u16, msg: []const u8) !void {
+    var out: [256]u8 = undefined;
+    const text = try std.fmt.bufPrint(&out, "{{\"status\":\"error\",\"error\":\"{s}\"}}", .{msg});
+    var hdr: [192]u8 = undefined;
+    const h = try std.fmt.bufPrint(&hdr, "HTTP/1.1 {d} Error\r\nContent-Type: application/json\r\nContent-Length: {d}\r\nConnection: close\r\n\r\n", .{ status, text.len });
+    try ctx.conn.stream.writeAll(h);
+    try ctx.conn.stream.writeAll(text);
 }

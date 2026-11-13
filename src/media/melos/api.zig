@@ -13,6 +13,7 @@ const types = @import("types.zig");
 const generate = @import("generate.zig");
 const live = @import("live.zig");
 const theory = @import("theory.zig");
+const pedals = @import("pedals.zig");
 
 pub const Result = struct {
     status: u16 = 200,
@@ -24,6 +25,12 @@ pub const Method = enum { get, post, other };
 /// Shared live session (single performance).
 var g_mutex: std.Thread.Mutex = .{};
 var g_live: ?live.LiveState = null;
+var g_pedals: pedals.PedalBoard = .{};
+var g_last_mod_ms: i64 = 0;
+var g_last_submit_ms: i64 = 0;
+/// Minimum gap between accepted crowd modulations / pedal submissions (global).
+pub var mod_cooldown_ms: i64 = 400;
+pub var submit_cooldown_ms: i64 = 1000;
 
 pub fn initLive(allocator: std.mem.Allocator) void {
     _ = allocator;
@@ -42,8 +49,12 @@ pub fn handle(allocator: std.mem.Allocator, method: Method, path_in: []const u8,
     if (post and std.mem.eql(u8, path, "/api/melos/analyze")) return handleAnalyze(allocator, body);
     if (post and std.mem.eql(u8, path, "/api/melos/live/step")) return handleLiveStep(allocator, body);
     if (post and std.mem.eql(u8, path, "/api/melos/live/modulate")) return handleLiveModulate(allocator, body);
-    if (get and std.mem.eql(u8, path, "/api/melos/pedals")) return .{ .body = try allocator.dupe(u8, "{\"pedals\":[]}") };
-    if (post and std.mem.eql(u8, path, "/api/melos/pedals/submit")) return .{ .body = try allocator.dupe(u8, "{\"status\":\"submitted\"}") };
+    if (get and std.mem.eql(u8, path, "/api/melos/pedals")) return handlePedalsList(allocator);
+    if (post and std.mem.eql(u8, path, "/api/melos/pedals/submit")) return handlePedalSubmit(allocator, body);
+    if (post and std.mem.eql(u8, path, "/api/melos/pedals/approve")) return handlePedalTransition(allocator, body, .approve);
+    if (post and std.mem.eql(u8, path, "/api/melos/pedals/activate")) return handlePedalTransition(allocator, body, .activate);
+    if (post and std.mem.eql(u8, path, "/api/melos/pedals/reject")) return handlePedalTransition(allocator, body, .reject);
+    if (post and std.mem.eql(u8, path, "/api/melos/pedals/deactivate")) return handlePedalTransition(allocator, body, .deactivate);
     return jsonError(allocator, 404, "melos route not found");
 }
 
@@ -166,6 +177,30 @@ pub fn handleAnalyze(allocator: std.mem.Allocator, body: []const u8) !Result {
     return .{ .body = try std.fmt.allocPrint(allocator, "{{\"status\":\"ok\",\"summary\":\"stub\"}}", .{}) };
 }
 
+/// Performer routes (live/step, pedal approval) require MELOS_PERFORMER_TOKEN
+/// when that environment variable is set. When it is not set they are open to
+/// whatever can reach the engine (loopback only; the public proxy whitelists
+/// only the viewer routes).
+fn performerOk(token: ?[]const u8) bool {
+    const want = std.posix.getenv("MELOS_PERFORMER_TOKEN") orelse return true;
+    const got = token orelse return false;
+    if (got.len != want.len) return false;
+    var diff: u8 = 0;
+    for (got, want) |x, y| diff |= x ^ y;
+    return diff == 0;
+}
+
+fn writeJsonString(w: anytype, s: []const u8) !void {
+    try w.writeByte('"');
+    for (s) |ch| switch (ch) {
+        '"' => try w.writeAll("\\\""),
+        '\\' => try w.writeAll("\\\\"),
+        0...0x1f => try w.print("\\u{x:0>4}", .{ch}),
+        else => try w.writeByte(ch),
+    };
+    try w.writeByte('"');
+}
+
 const StepBody = struct {
     base_prompt: ?[]const u8 = null,
     tempo_bpm: ?f32 = null,
@@ -173,6 +208,7 @@ const StepBody = struct {
     current_tick: ?u64 = null,
     seed: ?u64 = null,
     reset: ?bool = null,
+    token: ?[]const u8 = null,
 };
 
 fn chordName(w: anytype, st: *const live.LiveState, deg: u8) !void {
@@ -185,6 +221,12 @@ fn chordName(w: anytype, st: *const live.LiveState, deg: u8) !void {
     try w.print("{s}{s}", .{ note_names[root], q });
 }
 
+fn writeParams(w: anytype, p: generate.Params) !void {
+    try w.print("{{\"tempo_bpm\":{d:.1},\"density\":{d:.2},\"energy\":{d:.2},\"syncopation\":{d:.2},\"register\":{d},\"sevenths\":{s}}}", .{
+        p.tempo_bpm, p.density, p.energy, p.syncopation, p.register, if (p.seventh) "true" else "false",
+    });
+}
+
 pub fn handleLiveStep(allocator: std.mem.Allocator, body: []const u8) !Result {
     var scratch: [8 * 1024]u8 = undefined;
     var fba = std.heap.FixedBufferAllocator.init(&scratch);
@@ -193,6 +235,7 @@ pub fn handleLiveStep(allocator: std.mem.Allocator, body: []const u8) !Result {
         sb = std.json.parseFromSliceLeaky(StepBody, fba.allocator(), body, .{ .ignore_unknown_fields = true }) catch
             return jsonError(allocator, 400, "invalid json");
     }
+    if (!performerOk(sb.token)) return jsonError(allocator, 403, "performer token required");
 
     var out_buf: [8192]u8 = undefined;
     var fbs = std.io.fixedBufferStream(&out_buf);
@@ -214,21 +257,26 @@ pub fn handleLiveStep(allocator: std.mem.Allocator, body: []const u8) !Result {
     var bo = generate.BarOut{};
     const bar_tick = state.step(&bo);
 
+    var merged: [generate.MAX_BAR_NOTES + 28]types.MidiNote = undefined;
+    var n: usize = 0;
+    @memcpy(merged[n .. n + bo.mel_n], bo.melody[0..bo.mel_n]);
+    n += bo.mel_n;
+    @memcpy(merged[n .. n + bo.bass_n], bo.bass[0..bo.bass_n]);
+    n += bo.bass_n;
+    @memcpy(merged[n .. n + bo.pad_n], bo.pad[0..bo.pad_n]);
+    n += bo.pad_n;
+    const pedals_active = g_pedals.activeCount();
+    if (pedals_active > 0) n = g_pedals.applyActive(&merged, n);
+
     try w.print("{{\"status\":\"ok\",\"bar\":{d},\"tick\":{d},\"next_tick\":{d},\"phrase\":\"{s}\",\"bar_in_phrase\":{d},\"chord\":\"", .{
         state.steps - 1, bar_tick, state.current_tick, bo.phrase.label(), bo.bar_in_phrase,
     });
     try chordName(w, state, bo.chord_deg);
-    try w.print("\",\"key\":\"{s} {s}\",\"tempo_bpm\":{d:.1},\"notes\":[", .{ note_names[state.comp.tonic], @tagName(state.comp.mode), state.comp.p.tempo_bpm });
-    var first = true;
-    inline for (.{ "melody", "bass", "pad" }) |field| {
-        const n = @field(bo, if (std.mem.eql(u8, field, "melody")) "mel_n" else if (std.mem.eql(u8, field, "bass")) "bass_n" else "pad_n");
-        for (@field(bo, field)[0..n]) |nt| {
-            if (!first) try w.writeByte(',');
-            first = false;
-            try w.print("{{\"pitch\":{d},\"velocity\":{d},\"start_tick\":{d},\"duration_ticks\":{d},\"channel\":{d}}}", .{ nt.pitch, nt.velocity, nt.start_tick, nt.duration_ticks, nt.channel });
-        }
-    }
-    try w.writeAll("]}");
+    try w.print("\",\"key\":\"{s} {s}\",\"tempo_bpm\":{d:.1},\"pedals_active\":{d},\"params\":", .{ note_names[state.comp.tonic], @tagName(state.comp.mode), state.comp.p.tempo_bpm, pedals_active });
+    try writeParams(w, state.comp.p);
+    try w.writeAll(",\"notes\":");
+    try writeNotes(w, merged[0..n]);
+    try w.writeByte('}');
     return .{ .body = try allocator.dupe(u8, fbs.getWritten()) };
 }
 
@@ -242,23 +290,129 @@ pub fn handleLiveModulate(allocator: std.mem.Allocator, body: []const u8) !Resul
         mb = std.json.parseFromSliceLeaky(ModBody, fba.allocator(), body, .{ .ignore_unknown_fields = true }) catch
             return jsonError(allocator, 400, "invalid json");
     }
+    const prompt = mb.prompt orelse return jsonError(allocator, 400, "missing prompt");
+
+    var out_buf: [2048]u8 = undefined;
+    var fbs = std.io.fixedBufferStream(&out_buf);
+    const w = fbs.writer();
+
     g_mutex.lock();
     defer g_mutex.unlock();
     if (g_live == null) return jsonError(allocator, 409, "no live session: call live/step first");
-    const state = &g_live.?;
-    const prompt = mb.prompt orelse "";
-    if (generate.emotionFromText(prompt)) |e| {
-        const prof = theory.emotionProfile(e);
-        state.comp.emotion = e;
-        state.comp.setKey(state.comp.tonic, prof.mode);
-        state.comp.p.tempo_bpm = prof.tempo;
-        state.comp.p.density = prof.density;
-        state.comp.p.energy = prof.energy;
-        state.comp.p.syncopation = prof.syncopation;
-        state.comp.p.seventh = prof.seventh;
-        state.comp.p.clamp();
+    const now = std.time.milliTimestamp();
+    if (now - g_last_mod_ms < mod_cooldown_ms) {
+        return .{ .status = 429, .body = try std.fmt.allocPrint(allocator, "{{\"status\":\"error\",\"error\":\"slow down\",\"retry_after_ms\":{d}}}", .{mod_cooldown_ms - (now - g_last_mod_ms)}) };
     }
-    return .{ .body = try std.fmt.allocPrint(allocator, "{{\"status\":\"ok\",\"summary\":\"{s}\",\"tempo_bpm\":{d:.1}}}", .{ @tagName(state.comp.emotion), state.comp.p.tempo_bpm }) };
+    g_last_mod_ms = now;
+    const state = &g_live.?;
+    var ap = live.Applied{};
+    live.applyPrompt(&state.tgt, prompt, &ap);
+
+    try w.writeAll("{\"status\":\"ok\",\"summary\":");
+    var sum_buf: [200]u8 = undefined;
+    var sfbs = std.io.fixedBufferStream(&sum_buf);
+    const sw = sfbs.writer();
+    if (ap.n == 0) {
+        try sw.writeAll("no change (try: faster, softer, brighter, darker, busier, groove, higher)");
+    } else for (ap.labels[0..ap.n], 0..) |l, i| {
+        if (i > 0) try sw.writeAll(", ");
+        try sw.writeAll(l);
+    }
+    try writeJsonString(w, sfbs.getWritten());
+    try w.print(",\"applied\":{d},\"targets\":{{\"tempo_bpm\":{d:.1},\"density\":{d:.2},\"energy\":{d:.2},\"syncopation\":{d:.2},\"register\":{d},\"mode\":", .{
+        ap.n, state.tgt.tempo, state.tgt.density, state.tgt.energy, state.tgt.syncopation, state.tgt.register,
+    });
+    if (state.tgt.mode) |m| try w.print("\"{s}\"", .{@tagName(m)}) else try w.writeAll("null");
+    try w.writeAll("},\"current\":");
+    try writeParams(w, state.comp.p);
+    try w.print(",\"tempo_bpm\":{d:.1}}}", .{state.tgt.tempo});
+    return .{ .body = try allocator.dupe(u8, fbs.getWritten()) };
+}
+
+// ---------------------------------------------------------------------------
+// pedals
+// ---------------------------------------------------------------------------
+
+fn handlePedalsList(allocator: std.mem.Allocator) !Result {
+    var buf = std.ArrayList(u8).init(allocator);
+    errdefer buf.deinit();
+    const w = buf.writer();
+    g_mutex.lock();
+    defer g_mutex.unlock();
+    try w.writeAll("{\"pedals\":[");
+    for (g_pedals.items[0..g_pedals.count], 0..) |*p, i| {
+        if (i > 0) try w.writeByte(',');
+        try w.print("{{\"id\":{d},\"name\":", .{p.id});
+        try writeJsonString(w, p.nameS());
+        try w.writeAll(",\"author\":");
+        try writeJsonString(w, p.authorS());
+        try w.writeAll(",\"target_instrument\":");
+        try writeJsonString(w, p.instrumentS());
+        try w.writeAll(",\"description\":");
+        try writeJsonString(w, p.descriptionS());
+        try w.print(",\"status\":\"{s}\",\"pitch_shift\":{d},\"velocity_scale\":{d:.2},\"density_scale\":{d:.2},\"reverb_amount\":{d:.2},\"delay_ticks\":{d}}}", .{
+            @tagName(p.status), p.pitch_shift, p.velocity_scale, p.density_scale, p.reverb_amount, p.delay_ticks,
+        });
+    }
+    try w.writeAll("]}");
+    return .{ .body = try buf.toOwnedSlice() };
+}
+
+const PedalBody = struct {
+    name: ?[]const u8 = null,
+    author: ?[]const u8 = null,
+    target_instrument: ?[]const u8 = null,
+    instrument: ?[]const u8 = null,
+    description: ?[]const u8 = null,
+    pitch_shift: ?f32 = null,
+    velocity_scale: ?f32 = null,
+    density_scale: ?f32 = null,
+    reverb_amount: ?f32 = null,
+    delay_ticks: ?f32 = null,
+};
+
+fn handlePedalSubmit(allocator: std.mem.Allocator, body: []const u8) !Result {
+    var scratch: [4 * 1024]u8 = undefined;
+    var fba = std.heap.FixedBufferAllocator.init(&scratch);
+    const pb = std.json.parseFromSliceLeaky(PedalBody, fba.allocator(), body, .{ .ignore_unknown_fields = true }) catch
+        return jsonError(allocator, 400, "invalid json");
+    g_mutex.lock();
+    defer g_mutex.unlock();
+    const now = std.time.milliTimestamp();
+    if (now - g_last_submit_ms < submit_cooldown_ms) return jsonError(allocator, 429, "slow down");
+    const id = g_pedals.submit(.{
+        .name = pb.name orelse "",
+        .author = pb.author orelse "crowd",
+        .instrument = pb.target_instrument orelse pb.instrument orelse "",
+        .description = pb.description orelse "",
+        .pitch_shift = @intFromFloat(std.math.clamp(pb.pitch_shift orelse 0, -12, 12)),
+        .velocity_scale = pb.velocity_scale orelse 1.0,
+        .density_scale = pb.density_scale orelse 1.0,
+        .reverb_amount = pb.reverb_amount orelse 0.0,
+        .delay_ticks = @intFromFloat(std.math.clamp(pb.delay_ticks orelse 0, 0, 960)),
+    }) catch |e| return switch (e) {
+        error.BadName => jsonError(allocator, 400, "pedal needs a name"),
+        error.UnknownInstrument => jsonError(allocator, 400, "unknown instrument"),
+        error.BoardFull => jsonError(allocator, 409, "pedal board is full"),
+    };
+    g_last_submit_ms = now;
+    return .{ .body = try std.fmt.allocPrint(allocator, "{{\"status\":\"submitted\",\"id\":{d}}}", .{id}) };
+}
+
+const TransBody = struct { id: ?u32 = null, token: ?[]const u8 = null };
+
+fn handlePedalTransition(allocator: std.mem.Allocator, body: []const u8, t: pedals.PedalBoard.Transition) !Result {
+    var scratch: [2 * 1024]u8 = undefined;
+    var fba = std.heap.FixedBufferAllocator.init(&scratch);
+    const tb = std.json.parseFromSliceLeaky(TransBody, fba.allocator(), body, .{ .ignore_unknown_fields = true }) catch
+        return jsonError(allocator, 400, "invalid json");
+    if (!performerOk(tb.token)) return jsonError(allocator, 403, "performer token required");
+    const id = tb.id orelse return jsonError(allocator, 400, "missing id");
+    g_mutex.lock();
+    defer g_mutex.unlock();
+    if (!g_pedals.transition(id, t)) return jsonError(allocator, 409, "pedal not found or transition not allowed");
+    const p = g_pedals.find(id).?;
+    return .{ .body = try std.fmt.allocPrint(allocator, "{{\"status\":\"ok\",\"id\":{d},\"pedal_status\":\"{s}\"}}", .{ id, @tagName(p.status) }) };
 }
 
 // ---------------------------------------------------------------------------
@@ -339,7 +493,7 @@ test "modulate without a session is a JSON 409, with a session it responds" {
     const m = try handle(testing.allocator, .post, "/api/melos/live/modulate", "{\"prompt\":\"make it DARK\"}");
     defer testing.allocator.free(m.body);
     try testing.expectEqual(@as(u16, 200), m.status);
-    try testing.expect(std.mem.indexOf(u8, m.body, "dark") != null);
+    try testing.expect(std.mem.indexOf(u8, m.body, "mode minor") != null);
 }
 
 fn hammer(ticks: *[8][40]u64, idx: usize) void {
@@ -369,4 +523,103 @@ test "concurrent live steps are race-free: every bar tick is unique and contiguo
     try testing.expectEqual(@as(usize, 320), seen.count());
     var k: u64 = 1;
     while (k <= 320) : (k += 1) try testing.expect(seen.contains(k * 1920));
+}
+
+fn firstNotePitch(body: []const u8) !i64 {
+    const p = try std.json.parseFromSlice(std.json.Value, testing.allocator, body, .{});
+    defer p.deinit();
+    return p.value.object.get("notes").?.array.items[0].object.get("pitch").?.integer;
+}
+
+test "modulate returns real values and tempo actually moves over following steps" {
+    mod_cooldown_ms = 0;
+    submit_cooldown_ms = 0;
+    defer {
+        mod_cooldown_ms = 400;
+        submit_cooldown_ms = 1000;
+    }
+    const s0 = try handle(testing.allocator, .post, "/api/melos/live/step", "{\"seed\":4,\"reset\":true,\"tempo_bpm\":100,\"density\":0.5}");
+    testing.allocator.free(s0.body);
+    const m = try handle(testing.allocator, .post, "/api/melos/live/modulate", "{\"prompt\":\"Much FASTER please\"}");
+    defer testing.allocator.free(m.body);
+    try testing.expectEqual(@as(u16, 200), m.status);
+    const pm = try std.json.parseFromSlice(std.json.Value, testing.allocator, m.body, .{});
+    defer pm.deinit();
+    const tgt = pm.value.object.get("targets").?.object.get("tempo_bpm").?.float;
+    try testing.expect(tgt >= 119.9);
+    try testing.expect(pm.value.object.get("current") != null);
+    var last: f64 = 0;
+    for (0..4) |_| {
+        const r = try handle(testing.allocator, .post, "/api/melos/live/step", "{}");
+        defer testing.allocator.free(r.body);
+        const p = try std.json.parseFromSlice(std.json.Value, testing.allocator, r.body, .{});
+        defer p.deinit();
+        last = p.value.object.get("tempo_bpm").?.float;
+    }
+    try testing.expect(last > 100.0 and last <= 120.0);
+    const bad = try handle(testing.allocator, .post, "/api/melos/live/modulate", "{oops");
+    defer testing.allocator.free(bad.body);
+    try testing.expectEqual(@as(u16, 400), bad.status);
+    const nop = try handle(testing.allocator, .post, "/api/melos/live/modulate", "{}");
+    defer testing.allocator.free(nop.body);
+    try testing.expectEqual(@as(u16, 400), nop.status);
+}
+
+test "modulation is rate limited with a JSON 429" {
+    mod_cooldown_ms = 60_000;
+    defer mod_cooldown_ms = 400;
+    g_last_mod_ms = 0;
+    const s0 = try handle(testing.allocator, .post, "/api/melos/live/step", "{\"seed\":4,\"reset\":true}");
+    testing.allocator.free(s0.body);
+    const a = try handle(testing.allocator, .post, "/api/melos/live/modulate", "{\"prompt\":\"fast\"}");
+    testing.allocator.free(a.body);
+    try testing.expectEqual(@as(u16, 200), a.status);
+    const b = try handle(testing.allocator, .post, "/api/melos/live/modulate", "{\"prompt\":\"fast\"}");
+    defer testing.allocator.free(b.body);
+    try testing.expectEqual(@as(u16, 429), b.status);
+    try testing.expect(std.mem.indexOf(u8, b.body, "retry_after_ms") != null);
+}
+
+test "pedals: submit, list, performer approval, applied to live notes" {
+    mod_cooldown_ms = 0;
+    submit_cooldown_ms = 0;
+    defer {
+        mod_cooldown_ms = 400;
+        submit_cooldown_ms = 1000;
+    }
+    g_mutex.lock();
+    g_pedals = .{};
+    g_mutex.unlock();
+    const base0 = try handle(testing.allocator, .post, "/api/melos/live/step", "{\"seed\":8,\"reset\":true}");
+    defer testing.allocator.free(base0.body);
+    const base_pitch = try firstNotePitch(base0.body);
+
+    const bad = try handle(testing.allocator, .post, "/api/melos/pedals/submit", "{\"name\":\"x\",\"target_instrument\":\"Kazoo\"}");
+    defer testing.allocator.free(bad.body);
+    try testing.expectEqual(@as(u16, 400), bad.status);
+    const sub = try handle(testing.allocator, .post, "/api/melos/pedals/submit", "{\"name\":\"Up \\\"5\\\"\",\"author\":\"crowd\",\"target_instrument\":\"Piano\",\"description\":\"d\",\"pitch_shift\":5,\"velocity_scale\":1,\"reverb_amount\":0.2,\"delay_ticks\":0}");
+    defer testing.allocator.free(sub.body);
+    try testing.expectEqual(@as(u16, 200), sub.status);
+    const list = try handle(testing.allocator, .get, "/api/melos/pedals", "");
+    defer testing.allocator.free(list.body);
+    const lp = try std.json.parseFromSlice(std.json.Value, testing.allocator, list.body, .{});
+    defer lp.deinit();
+    const p0 = lp.value.object.get("pedals").?.array.items[0].object;
+    try testing.expectEqualStrings("submitted", p0.get("status").?.string);
+    try testing.expectEqualStrings("Up \"5\"", p0.get("name").?.string);
+
+    // not approved -> cannot activate; approved+active -> notes shift by 5
+    const na = try handle(testing.allocator, .post, "/api/melos/pedals/activate", "{\"id\":1}");
+    defer testing.allocator.free(na.body);
+    try testing.expectEqual(@as(u16, 409), na.status);
+    const ap = try handle(testing.allocator, .post, "/api/melos/pedals/approve", "{\"id\":1}");
+    defer testing.allocator.free(ap.body);
+    try testing.expectEqual(@as(u16, 200), ap.status);
+    const ac = try handle(testing.allocator, .post, "/api/melos/pedals/activate", "{\"id\":1}");
+    defer testing.allocator.free(ac.body);
+    try testing.expectEqual(@as(u16, 200), ac.status);
+    const again = try handle(testing.allocator, .post, "/api/melos/live/step", "{\"seed\":8,\"reset\":true}");
+    defer testing.allocator.free(again.body);
+    try testing.expect(std.mem.indexOf(u8, again.body, "\"pedals_active\":1") != null);
+    try testing.expectEqual(base_pitch + 5, try firstNotePitch(again.body));
 }

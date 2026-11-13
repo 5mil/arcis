@@ -5,5 +5,6 @@ test {
     _ = @import("generate.zig");
     _ = @import("live.zig");
     _ = @import("api.zig");
+    _ = @import("pedals.zig");
 
 }
