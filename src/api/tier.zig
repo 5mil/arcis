@@ -70,35 +70,11 @@ fn forbidden(allocator: Allocator) !Response {
 }
 
 fn dispatchMelos(allocator: Allocator, req: *Request) !Response {
-    const path = req.path;
-    const body = req.body;
-
-    if (std.mem.eql(u8, path, "/api/melos/generate") and req.method == .POST) {
-        const out = try melos_api.handleGenerate(allocator, body);
-        return Response{ .status = 200, .body = out, .allocator = allocator };
-    }
-    if (std.mem.eql(u8, path, "/api/melos/analyze") and req.method == .POST) {
-        const out = try melos_api.handleAnalyze(allocator, body);
-        return Response{ .status = 200, .body = out, .allocator = allocator };
-    }
-    if (std.mem.eql(u8, path, "/api/melos/live/step") and req.method == .POST) {
-        const out = try melos_api.handleLiveStep(allocator, body);
-        return Response{ .status = 200, .body = out, .allocator = allocator };
-    }
-    if (std.mem.eql(u8, path, "/api/melos/live/modulate") and req.method == .POST) {
-        const out = try melos_api.handleLiveModulate(allocator, body);
-        return Response{ .status = 200, .body = out, .allocator = allocator };
-    }
-    // Pedal routes (stubs for now — full board later)
-    if (std.mem.eql(u8, path, "/api/melos/pedals") and req.method == .GET) {
-        const out = try allocator.dupe(u8, "{\"pedals\":[]}");
-        return Response{ .status = 200, .body = out, .allocator = allocator };
-    }
-    if (std.mem.eql(u8, path, "/api/melos/pedals/submit") and req.method == .POST) {
-        const out = try allocator.dupe(u8, "{\"status\":\"submitted\"}");
-        return Response{ .status = 200, .body = out, .allocator = allocator };
-    }
-
-    const err = try allocator.dupe(u8, "{\"error\":\"melos route not found\"}");
-    return Response{ .status = 404, .body = err, .allocator = allocator };
+    const method: melos_api.Method = switch (req.method) {
+        .GET => .get,
+        .POST => .post,
+        else => .other,
+    };
+    const r = try melos_api.handle(allocator, method, req.path, req.body);
+    return Response{ .status = r.status, .body = r.body, .allocator = allocator };
 }
