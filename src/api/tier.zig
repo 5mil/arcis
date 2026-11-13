@@ -8,6 +8,7 @@ const root_page = @import("root_page.zig");
 const rag_scan  = @import("rag_scan.zig");
 const health_ex = @import("health_ex.zig");
 const ArcisSession = @import("dashboard").ArcisSession;
+const melos_api = @import("media/melos/api.zig");
 
 pub const Caps = struct {
     infer: bool = false, rag: bool = false, agents: bool = false, workflow: bool = false,
@@ -37,6 +38,8 @@ pub const TierDispatcher = struct {
     pub fn dispatch(self: *TierDispatcher, allocator: Allocator, req: *Request) !Response {
         const path = req.path;
         const session = self.session orelse return error.NoSession;
+
+        // Core routes
         if (std.mem.eql(u8, path, "/") or std.mem.eql(u8, path, "/index.html"))
             return root_page.handleRoot(allocator, req, session);
         if (std.mem.eql(u8, path, "/health") or std.mem.startsWith(u8, path, "/health?"))
@@ -49,7 +52,53 @@ pub const TierDispatcher = struct {
         if (std.mem.eql(u8, path, "/workflow/run")) return handlers.handleWorkflowRun(allocator, req, session);
         if (std.mem.eql(u8, path, "/term/propose")) return handlers.handleTermPropose(allocator, req, session);
         if (std.mem.eql(u8, path, "/term/validate")) return handlers.handleTermValidate(allocator, req, session);
+
+        // Melos routes (media tier)
+        if (std.mem.startsWith(u8, path, "/api/melos/")) {
+            if (!self.tier.caps.media) return forbidden(allocator);
+            return try dispatchMelos(allocator, req);
+        }
+
         const body = try allocator.dupe(u8, "{\"error\":\"not found\"}");
         return Response{ .status = 404, .body = body, .allocator = allocator };
     }
 };
+
+fn forbidden(allocator: Allocator) !Response {
+    const body = try allocator.dupe(u8, "{\"error\":\"tier does not permit this capability\"}");
+    return Response{ .status = 403, .body = body, .allocator = allocator };
+}
+
+fn dispatchMelos(allocator: Allocator, req: *Request) !Response {
+    const path = req.path;
+    const body = req.body;
+
+    if (std.mem.eql(u8, path, "/api/melos/generate") and req.method == .POST) {
+        const out = try melos_api.handleGenerate(allocator, body);
+        return Response{ .status = 200, .body = out, .allocator = allocator };
+    }
+    if (std.mem.eql(u8, path, "/api/melos/analyze") and req.method == .POST) {
+        const out = try melos_api.handleAnalyze(allocator, body);
+        return Response{ .status = 200, .body = out, .allocator = allocator };
+    }
+    if (std.mem.eql(u8, path, "/api/melos/live/step") and req.method == .POST) {
+        const out = try melos_api.handleLiveStep(allocator, body);
+        return Response{ .status = 200, .body = out, .allocator = allocator };
+    }
+    if (std.mem.eql(u8, path, "/api/melos/live/modulate") and req.method == .POST) {
+        const out = try melos_api.handleLiveModulate(allocator, body);
+        return Response{ .status = 200, .body = out, .allocator = allocator };
+    }
+    // Pedal routes (stubs for now — full board later)
+    if (std.mem.eql(u8, path, "/api/melos/pedals") and req.method == .GET) {
+        const out = try allocator.dupe(u8, "{\"pedals\":[]}");
+        return Response{ .status = 200, .body = out, .allocator = allocator };
+    }
+    if (std.mem.eql(u8, path, "/api/melos/pedals/submit") and req.method == .POST) {
+        const out = try allocator.dupe(u8, "{\"status\":\"submitted\"}");
+        return Response{ .status = 200, .body = out, .allocator = allocator };
+    }
+
+    const err = try allocator.dupe(u8, "{\"error\":\"melos route not found\"}");
+    return Response{ .status = 404, .body = err, .allocator = allocator };
+}
