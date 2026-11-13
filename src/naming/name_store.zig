@@ -3,7 +3,7 @@
 
 const std = @import("std");
 const Allocator  = std.mem.Allocator;
-const common     = @import("common");
+const common     = @import("../common/root.zig");
 const EntityId   = common.EntityId;
 const IdSequence = common.IdSequence;
 const makeUrn    = common.makeUrn;
