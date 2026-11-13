@@ -47,7 +47,7 @@ pub fn generateStub(
     const random = rng.random();
 
     for (events, 0..) |*note, i| {
-        const base: u8 = if (attrs.key) |k| k.tonic + 60 else 60;
+        const base: u8 = if (attrs.key) |k| @as(u8, k.tonic) + 60 else 60;
         note.* = .{
             .pitch = base + @as(u8, @intCast(random.intRangeAtMost(u8, 0, 12))),
             .velocity = 80,

@@ -23,7 +23,7 @@ pub fn initLive(allocator: std.mem.Allocator) void {
 /// POST /api/melos/generate
 pub fn handleGenerate(allocator: std.mem.Allocator, body: []const u8) ![]u8 {
     // Minimal parse: look for "text" field (real JSON parser later)
-    var req = generate.GenerateRequest{ .text = body };
+    const req = generate.GenerateRequest{ .text = body };
     var result = try generate.generateStub(allocator, req);
     defer result.deinit();
     // Return simple JSON sketch
@@ -42,6 +42,7 @@ pub fn handleAnalyze(allocator: std.mem.Allocator, body: []const u8) ![]u8 {
 
 /// POST /api/melos/live/step
 pub fn handleLiveStep(allocator: std.mem.Allocator, body: []const u8) ![]u8 {
+    _ = body;
     if (g_live == null) {
         // bootstrap
         g_live = live.LiveState{
@@ -50,7 +51,7 @@ pub fn handleLiveStep(allocator: std.mem.Allocator, body: []const u8) ![]u8 {
             .allocator = allocator,
         };
     }
-    var state = &g_live.? ;
+    const state = &g_live.?;
     const notes = try live.liveStep(allocator, state);
     defer allocator.free(notes);
     return try std.fmt.allocPrint(
@@ -63,7 +64,7 @@ pub fn handleLiveStep(allocator: std.mem.Allocator, body: []const u8) ![]u8 {
 /// POST /api/melos/live/modulate
 pub fn handleLiveModulate(allocator: std.mem.Allocator, body: []const u8) ![]u8 {
     if (g_live == null) return error.NoLiveSession;
-    var state = &g_live.? ;
+    const state = &g_live.?;
     const new_attrs = try live.modulateFromPrompt(allocator, state, body);
     state.attributes = new_attrs;
     return try std.fmt.allocPrint(
