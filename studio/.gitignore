@@ -1,0 +1,7 @@
+node_modules
+.vercel
+.grok
+dist
+*.log
+.env
+.env.*
