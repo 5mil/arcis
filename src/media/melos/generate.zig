@@ -106,6 +106,54 @@ const Cell = struct {
     step: [16]i16 = undefined,
 };
 
+/// Remembered rhythm + contour of a bar, reusable with transformations.
+const Motif = struct {
+    n: u8 = 0,
+    pos: [16]u8 = undefined,
+    dur: [16]u8 = undefined,
+    rest: [16]bool = undefined,
+    delta: [16]i16 = undefined, // scale steps relative to `anchor`
+    anchor: i32 = 0,
+    valid: bool = false,
+};
+
+const MotifId = enum { none, a, b };
+const Kind = enum { fresh, repeat, variation, invert, transpose, fragment };
+const Action = struct { kind: Kind = .fresh, motif: MotifId = .none, shift: i32 = 0, record: MotifId = .none };
+
+/// Phrase plan: A A' B cadence, with developed motifs.
+///  A  : fresh(record A) | repeat A | A up a step (sequence) | fresh answer
+///  A' : exact A         | A varied | A down a step           | fresh half-close
+///  B  : fresh(record B) | B inverted | B up a third          | B varied
+///  C  : A fragment      | A varied, lower | fresh approach    | final tonic
+fn planAction(ph: u8, bi: u8) Action {
+    return switch (ph) {
+        0 => switch (bi) {
+            0 => .{ .record = .a },
+            1 => .{ .kind = .repeat, .motif = .a },
+            2 => .{ .kind = .transpose, .motif = .a, .shift = 1 },
+            else => .{},
+        },
+        1 => switch (bi) {
+            0 => .{ .kind = .repeat, .motif = .a },
+            1 => .{ .kind = .variation, .motif = .a },
+            2 => .{ .kind = .transpose, .motif = .a, .shift = -1 },
+            else => .{},
+        },
+        2 => switch (bi) {
+            0 => .{ .record = .b },
+            1 => .{ .kind = .invert, .motif = .b },
+            2 => .{ .kind = .transpose, .motif = .b, .shift = 2 },
+            else => .{ .kind = .variation, .motif = .b },
+        },
+        else => switch (bi) {
+            0 => .{ .kind = .fragment, .motif = .a },
+            1 => .{ .kind = .variation, .motif = .a, .shift = -1 },
+            else => .{},
+        },
+    };
+}
+
 pub const Composer = struct {
     tonic: u4,
     mode: types.Mode,
@@ -121,6 +169,8 @@ pub const Composer = struct {
     cur_step: i32 = 4,
     leap_dir: i8 = 0,
     voicing: ?theory.Voicing = null,
+    motif_a: Motif = .{},
+    motif_b: Motif = .{},
 
     pub fn init(req: GenerateRequest) Composer {
         const attrs = req.attributes orelse types.MusicAttributes{};
@@ -273,7 +323,9 @@ pub const Composer = struct {
     }
 
     fn startTick(bar_start: i32, pos: i32, jit: i32) u32 {
-        return @intCast(@max(bar_start + pos * @as(i32, SIXTEENTH) + jit, 0));
+        // Downbeats may lag but never lead, so a note always stays inside its bar.
+        const j = if (pos == 0) @max(jit, 0) else jit;
+        return @intCast(@max(bar_start + pos * @as(i32, SIXTEENTH) + j, 0));
     }
 
     // ----- melody --------------------------------------------------------
@@ -411,33 +463,101 @@ pub const Composer = struct {
             return;
         }
 
+        const act = planAction(@intFromEnum(out.phrase), bip);
         var cell = Cell{};
-        self.genRhythm(rnd, &cell);
-
-        // Contour target (scale steps relative to the tonic octave): an arch.
-        const arch = [4]i32{ 4, 6, 5, 2 };
-        const target = arch[bip] + @as(i32, self.p.register);
-
-        var last_sounding: ?usize = null;
-        for (0..cell.n) |i| {
-            if (cell.rest[i]) continue;
-            const strong = cell.pos[i] % 8 == 0;
-            cell.step[i] = @intCast(self.walk(rnd, strong, deg, target, lo, hi));
-            self.cur_step = cell.step[i];
-            last_sounding = i;
+        const m: ?*const Motif = switch (act.motif) {
+            .a => &self.motif_a,
+            .b => &self.motif_b,
+            .none => null,
+        };
+        if (act.kind != .fresh and m != null and m.?.valid) {
+            self.cellFromMotif(rnd, m.?, act, deg, lo, hi, &cell);
+        } else {
+            self.genRhythm(rnd, &cell);
+            // Contour target (scale steps relative to the tonic octave): an arch.
+            const arch = [4]i32{ 4, 6, 5, 2 };
+            const target = arch[bip] + @as(i32, self.p.register);
+            for (0..cell.n) |i| {
+                if (cell.rest[i]) continue;
+                const strong = cell.pos[i] % 8 == 0;
+                cell.step[i] = @intCast(self.walk(rnd, strong, deg, target, lo, hi));
+                self.cur_step = cell.step[i];
+            }
+            if (act.record != .none) self.record(act.record, &cell);
         }
-        if (penult) if (last_sounding) |li| {
-            const strong = cell.pos[li] % 8 == 0;
-            if (self.nearestStepWithDegrees(cell.step[li], 1, 6, lo, hi)) |c| {
-                if (!strong or theory.isChordStep(c, deg)) {
-                    cell.step[li] = @intCast(c);
-                    self.cur_step = c;
-                    self.leap_dir = 0;
+
+        if (penult) {
+            var li: ?usize = null;
+            for (0..cell.n) |i| if (!cell.rest[i]) {
+                li = i;
+            };
+            if (li) |l| {
+                const strong = cell.pos[l] % 8 == 0;
+                if (self.nearestStepWithDegrees(cell.step[l], 1, 6, lo, hi)) |c| {
+                    if (!strong or theory.isChordStep(c, deg)) {
+                        cell.step[l] = @intCast(c);
+                        self.cur_step = c;
+                        self.leap_dir = 0;
+                    }
                 }
             }
-        };
+        }
 
         self.emitMelody(out, rnd, &cell, bar_start, vbase + swell[bip]);
+    }
+
+    fn record(self: *Composer, which: MotifId, cell: *const Cell) void {
+        var first: ?i32 = null;
+        for (0..cell.n) |i| if (!cell.rest[i]) {
+            first = cell.step[i];
+            break;
+        };
+        const a = first orelse return;
+        var mo = Motif{ .n = cell.n, .anchor = a, .valid = true };
+        for (0..cell.n) |i| {
+            mo.pos[i] = cell.pos[i];
+            mo.dur[i] = cell.dur[i];
+            mo.rest[i] = cell.rest[i];
+            mo.delta[i] = if (cell.rest[i]) 0 else @intCast(cell.step[i] - a);
+        }
+        if (which == .a) self.motif_a = mo else self.motif_b = mo;
+    }
+
+    fn cellFromMotif(self: *Composer, rnd: std.Random, m: *const Motif, act: Action, deg: i32, lo: i32, hi: i32, cell: *Cell) void {
+        var n: u8 = 0;
+        var last: i32 = m.anchor;
+        for (0..m.n) |i| {
+            if (act.kind == .fragment and m.pos[i] >= 8) break;
+            cell.pos[n] = m.pos[i];
+            cell.dur[n] = m.dur[i];
+            cell.rest[n] = m.rest[i];
+            if (act.kind == .fragment and m.pos[i] + m.dur[i] > 8) cell.dur[n] = 8 - m.pos[i];
+            if (!m.rest[i]) {
+                var d: i32 = m.delta[i];
+                if (act.kind == .invert) d = -d;
+                var s: i32 = m.anchor + act.shift + d;
+                if (act.kind == .variation and i > 0 and rnd.float(f32) < 0.4) s += if (rnd.boolean()) @as(i32, 1) else -1;
+                if (s > hi) s = hi - @min(s - hi, hi - lo);
+                if (s < lo) s = lo + @min(lo - s, hi - lo);
+                s = std.math.clamp(s, lo, hi);
+                if (cell.pos[n] % 8 == 0) s = fitChord(s, deg, lo, hi);
+                cell.step[n] = @intCast(s);
+                last = s;
+            }
+            n += 1;
+        }
+        if (act.kind == .fragment and n < 16) {
+            cell.pos[n] = 8;
+            cell.dur[n] = 8;
+            cell.rest[n] = false;
+            const s = fitChord(last, deg, lo, hi);
+            cell.step[n] = @intCast(s);
+            last = s;
+            n += 1;
+        }
+        cell.n = n;
+        self.cur_step = last;
+        self.leap_dir = 0;
     }
 
     fn emitMelody(self: *const Composer, out: *BarOut, rnd: std.Random, cell: *const Cell, bar_start: i32, vb: i32) void {
