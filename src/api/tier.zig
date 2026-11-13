@@ -7,8 +7,8 @@ const handlers  = @import("handlers.zig");
 const root_page = @import("root_page.zig");
 const rag_scan  = @import("rag_scan.zig");
 const health_ex = @import("health_ex.zig");
-const ArcisSession = @import("dashboard").ArcisSession;
-const melos_api = @import("media/melos/api.zig");
+const ArcisSession = @import("../dashboard/arcis_session.zig").ArcisSession;
+const melos_api = @import("../media/melos/api.zig");
 
 pub const Caps = struct {
     infer: bool = false, rag: bool = false, agents: bool = false, workflow: bool = false,
