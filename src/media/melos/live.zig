@@ -26,7 +26,7 @@ pub fn liveStep(
     allocator: std.mem.Allocator,
     state: *LiveState,
 ) ![]types.MidiNote {
-    var req = generate.GenerateRequest{
+    const req = generate.GenerateRequest{
         .text = state.base_prompt,
         .attributes = state.attributes,
         .bars = 1,
