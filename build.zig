@@ -192,6 +192,18 @@ pub fn build(b: *std.Build) void {
         single_step.dependOn(&run_t.step);
     }
 
+    // Melos music-engine tests (self-contained, relative imports only)
+    const melos_test = b.addTest(.{
+        .name = "melos",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/media/melos/melos_tests.zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
+    });
+    const melos_step = b.step("test-melos", "Run Melos music-engine tests");
+    melos_step.dependOn(&b.addRunArtifact(melos_test).step);
+
     // ---------------------------------------------------------------------------
     // Tier-specific run steps
     // ---------------------------------------------------------------------------
