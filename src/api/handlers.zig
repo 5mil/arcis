@@ -5,7 +5,7 @@ const std       = @import("std");
 const Allocator = std.mem.Allocator;
 const Request   = @import("server.zig").Request;
 const Response  = @import("server.zig").Response;
-const ArcisSession = @import("dashboard").ArcisSession;
+const ArcisSession = @import("../dashboard/arcis_session.zig").ArcisSession;
 
 // ---------------------------------------------------------------------------
 // Health
@@ -116,7 +116,7 @@ pub fn handleName(allocator: Allocator, req: *Request, session: *ArcisSession) !
     const trad_s = jsonGetString(req.body, "tradition") orelse "greek";
     const rank_s = jsonGetString(req.body, "rank") orelse "adept";
 
-    const naming = @import("naming");
+    const naming = @import("../naming/root.zig");
     const NameKind  = naming.NameKind;
     const Tradition = naming.Tradition;
     const Rank      = naming.Rank;
@@ -148,7 +148,7 @@ pub fn handleWorkflowRun(allocator: Allocator, req: *Request, session: *ArcisSes
     const wf_id = std.fmt.parseInt(u32, wf_id_str, 10) catch
         return badRequest(allocator, "invalid workflow_id");
     const text = jsonGetString(req.body, "payload") orelse "";
-    const Payload = @import("workflow").Payload;
+    const Payload = @import("../workflow/root.zig").Payload;
     const job_id = try session.workflow.runNow(wf_id, Payload{ .text = text });
     const job    = session.workflow.getJob(job_id) orelse return internalError(allocator);
     const out = try std.fmt.allocPrint(allocator,

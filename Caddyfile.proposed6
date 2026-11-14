@@ -1,0 +1,113 @@
+# Caddyfile.proposed6 — proposed4 + Melos auth and performer route proxies.
+# Auth is enforced by the engine (session cookie or optional performer token).
+# Apply only after `performers.sh init` on the VPS (hash file present).
+# No Caddy admin API, no other new public surfaces.
+#
+# As root:
+#   sudo cp /etc/caddy/Caddyfile /etc/caddy/Caddyfile.bak-$(date +%s)
+#   sudo cp /opt/arcis/engine/Caddyfile.proposed6 /etc/caddy/Caddyfile
+#   sudo caddy validate --config /etc/caddy/Caddyfile && sudo systemctl reload caddy
+
+fizz.beer, www.fizz.beer {
+	@bare host fizz.beer
+	redir @bare https://www.fizz.beer{uri} 308
+	root * /var/www/arcis
+	encode gzip
+	header {
+		-Server
+		X-Content-Type-Options nosniff
+		Referrer-Policy no-referrer
+	}
+	@not_melos not path /melos /melos/*
+	header @not_melos Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: https://cdn.discordapp.com; connect-src 'self'; form-action 'none'; frame-ancestors 'none'; base-uri 'none'; object-src 'none'"
+	@dev path /auth/dev-login
+	handle @dev {
+		respond 404
+	}
+	@melos_public {
+		path /api/melos/pedals /api/melos/pedals/submit /api/melos/live/modulate
+	}
+	handle @melos_public {
+		request_body {
+			max_size 2KB
+		}
+		reverse_proxy 127.0.0.1:8080 {
+			header_up X-Real-IP {remote_host}
+			transport http {
+				dial_timeout 3s
+				response_header_timeout 10s
+			}
+		}
+	}
+	# Auth + performer routes. The engine (not Caddy) enforces a session cookie
+	# or MELOS_PERFORMER_TOKEN. Do not apply until `performers.sh init` has
+	# created accounts; without a hash file the engine would leave these
+	# routes open on loopback (and therefore to anyone once proxied).
+	@melos_auth {
+		path /api/melos/auth /api/melos/auth/*
+	}
+	handle @melos_auth {
+		request_body {
+			max_size 2KB
+		}
+		reverse_proxy 127.0.0.1:8080 {
+			header_up X-Real-IP {remote_host}
+			transport http {
+				dial_timeout 3s
+				response_header_timeout 20s
+			}
+		}
+	}
+	@melos_performer {
+		path /api/melos/generate /api/melos/live/step /api/melos/pedals/approve /api/melos/pedals/activate /api/melos/pedals/reject /api/melos/pedals/deactivate
+	}
+	handle @melos_performer {
+		request_body {
+			max_size 8KB
+		}
+		reverse_proxy 127.0.0.1:8080 {
+			header_up X-Real-IP {remote_host}
+			transport http {
+				dial_timeout 3s
+				response_header_timeout 20s
+			}
+		}
+	}
+	handle /api/melos/* {
+		respond 404
+	}
+	@community path /api/* /auth/*
+	handle @community {
+		request_body {
+			max_size 2KB
+		}
+		reverse_proxy 127.0.0.1:8765 {
+			header_up X-Real-IP {remote_host}
+			transport http {
+				dial_timeout 3s
+				response_header_timeout 20s
+			}
+		}
+	}
+	@melos_exact path /melos
+	redir @melos_exact /melos/ 308
+	handle /melos/* {
+		# Lamp Room: React style= attributes, Kick embed, self-hosted fonts.
+		# Scripts are external files only. Site-wide CSP is not loosened.
+		header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-src https://player.kick.com; form-action 'none'; frame-ancestors 'none'; base-uri 'none'; object-src 'none'"
+		@webmanifest path *.webmanifest
+		header @webmanifest Content-Type application/manifest+json
+		try_files {path} /melos/index.html
+		file_server
+	}
+	handle {
+		file_server
+	}
+	log {
+		output file /var/log/caddy/access.log
+		# OAuth callback query strings contain short-lived authorization codes.
+		# Do not record auth/API requests or identifying session-related headers.
+	}
+	@private path /auth/* /api/*
+	skip_log @private
+}
