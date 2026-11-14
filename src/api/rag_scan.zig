@@ -3,7 +3,7 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const Request = @import("server.zig").Request;
 const Response = @import("server.zig").Response;
-const ArcisSession = @import("dashboard").ArcisSession;
+const ArcisSession = @import("../dashboard/arcis_session.zig").ArcisSession;
 
 fn jsonGetString(body: []const u8, key: []const u8) ?[]const u8 {
     var needle_buf: [64]u8 = undefined;
