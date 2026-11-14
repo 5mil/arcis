@@ -7,8 +7,8 @@ const handlers  = @import("handlers.zig");
 const root_page = @import("root_page.zig");
 const rag_scan  = @import("rag_scan.zig");
 const health_ex = @import("health_ex.zig");
-const ArcisSession = @import("dashboard").ArcisSession;
-const melos_api = @import("media/melos/api.zig");
+const ArcisSession = @import("../dashboard/arcis_session.zig").ArcisSession;
+const melos_api = @import("../media/melos/api.zig");
 
 pub const Caps = struct {
     infer: bool = false, rag: bool = false, agents: bool = false, workflow: bool = false,
@@ -70,35 +70,18 @@ fn forbidden(allocator: Allocator) !Response {
 }
 
 fn dispatchMelos(allocator: Allocator, req: *Request) !Response {
-    const path = req.path;
-    const body = req.body;
-
-    if (std.mem.eql(u8, path, "/api/melos/generate") and req.method == .POST) {
-        const out = try melos_api.handleGenerate(allocator, body);
-        return Response{ .status = 200, .body = out, .allocator = allocator };
-    }
-    if (std.mem.eql(u8, path, "/api/melos/analyze") and req.method == .POST) {
-        const out = try melos_api.handleAnalyze(allocator, body);
-        return Response{ .status = 200, .body = out, .allocator = allocator };
-    }
-    if (std.mem.eql(u8, path, "/api/melos/live/step") and req.method == .POST) {
-        const out = try melos_api.handleLiveStep(allocator, body);
-        return Response{ .status = 200, .body = out, .allocator = allocator };
-    }
-    if (std.mem.eql(u8, path, "/api/melos/live/modulate") and req.method == .POST) {
-        const out = try melos_api.handleLiveModulate(allocator, body);
-        return Response{ .status = 200, .body = out, .allocator = allocator };
-    }
-    // Pedal routes (stubs for now — full board later)
-    if (std.mem.eql(u8, path, "/api/melos/pedals") and req.method == .GET) {
-        const out = try allocator.dupe(u8, "{\"pedals\":[]}");
-        return Response{ .status = 200, .body = out, .allocator = allocator };
-    }
-    if (std.mem.eql(u8, path, "/api/melos/pedals/submit") and req.method == .POST) {
-        const out = try allocator.dupe(u8, "{\"status\":\"submitted\"}");
-        return Response{ .status = 200, .body = out, .allocator = allocator };
-    }
-
-    const err = try allocator.dupe(u8, "{\"error\":\"melos route not found\"}");
-    return Response{ .status = 404, .body = err, .allocator = allocator };
+    const method: melos_api.Method = switch (req.method) {
+        .GET => .get,
+        .POST => .post,
+        else => .other,
+    };
+    const auth = melos_api.AuthInfo{
+        .cookie = req.cookie,
+        .origin = req.origin,
+        .referer = req.referer,
+        .remote_ip = req.remote_ip,
+        .peer_loopback = req.peer_loopback,
+    };
+    const r = try melos_api.handleWithAuth(allocator, method, req.path, req.body, auth);
+    return Response{ .status = r.status, .body = r.body, .set_cookie = r.set_cookie, .cors = r.cors, .allocator = allocator };
 }

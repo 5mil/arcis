@@ -5,20 +5,20 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 
 // Subsystem imports via named modules (resolves even when this file is a test root)
-const common       = @import("common");
+const common       = @import("../common/root.zig");
 const IdSequence    = common.IdSequence;
-const ontology      = @import("ontology");
+const ontology      = @import("../ontology/root.zig");
 const ConceptStore  = ontology.ConceptStore;
 const TermDir       = ontology.TerminologyDirectory;
-const library       = @import("library");
+const library       = @import("../library/root.zig");
 const Catalog       = library.Catalog;
 const Viewer        = library.Viewer;
-const NameStore     = @import("naming").NameStore;
-const UnifiedSearch = @import("search").UnifiedSearchIndex;
-const WorkflowSession = @import("workflow").WorkflowSession;
-const TierDispatcher = @import("api").TierDispatcher;
+const NameStore     = @import("../naming/root.zig").NameStore;
+const UnifiedSearch = @import("../search/index.zig").UnifiedSearchIndex;
+const WorkflowSession = @import("../workflow/root.zig").WorkflowSession;
+const TierDispatcher = @import("../api/tier.zig").TierDispatcher;
 const ViewBuilder   = @import("views.zig").ViewBuilder;
-const InferenceEngine = @import("infer").InferenceEngine;
+const InferenceEngine = @import("../infer/engine.zig").InferenceEngine;
 
 // ---------------------------------------------------------------------------
 // ArcisSession
