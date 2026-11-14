@@ -397,3 +397,30 @@ canvas.wave-canvas { width: 100%; height: 100%; display: block; background: var(
   .stage-copy strong { font-size: 28px; }
   .title-input { width: 120px; }
 }
+
+.engine-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-size: 11px;
+  color: var(--color-mist);
+}
+.engine-pill i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--color-mist);
+}
+.engine-pill.connected {
+  color: var(--color-amber);
+}
+.engine-pill.connected i {
+  background: var(--color-amber);
+}
+
+.performer-auth input[type="password"],
+.performer-auth input[type="text"] {
+  width: 100%;
+}
