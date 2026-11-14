@@ -4,7 +4,7 @@
 
 const std = @import("std");
 const Allocator  = std.mem.Allocator;
-const common     = @import("common");
+const common     = @import("../common/root.zig");
 const Concept    = common.Concept;
 const Relation   = common.Relation;
 const RelationKind = common.RelationKind;

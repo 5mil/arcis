@@ -5,9 +5,9 @@
 
 const std = @import("std");
 const Allocator  = std.mem.Allocator;
-const common     = @import("common");
+const common     = @import("../common/root.zig");
 const EntityId   = common.EntityId;
-const rag        = @import("rag");
+const rag        = @import("../rag/root.zig");
 const Embedder   = rag.Embedder;
 const VectorIndex = rag.VectorIndex;
 const ScoredDoc  = rag.SearchResult;
