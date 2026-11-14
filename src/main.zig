@@ -6,6 +6,7 @@ const ArcisSession   = @import("dashboard/arcis_session.zig").ArcisSession;
 const Server         = @import("api/server.zig").Server;
 const ServerConfig   = @import("api/server.zig").ServerConfig;
 const TierDispatcher = @import("api/tier.zig").TierDispatcher;
+const performers    = @import("media/melos/performers.zig");
 
 const HOUSE_GGUF = "models/gguf/DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M.gguf";
 
@@ -16,6 +17,11 @@ pub fn main() !void {
 
     const args = try std.process.argsAlloc(allocator);
     defer std.process.argsFree(allocator, args);
+
+    if (args.len >= 2 and std.mem.eql(u8, args[1], "performers")) {
+        try performers.runCli(allocator, args[2..]);
+        return;
+    }
 
     var tier: []const u8 = "visio";
     var port: u16 = 9090;
@@ -51,9 +57,18 @@ pub fn main() !void {
         std.log.info("no model; run tools/pull_gguf.sh then restart", .{});
     }
 
-    var dispatcher = TierDispatcher.init(allocator, &session, tier);
-    var srv = Server.init(allocator, &dispatcher, .{ .port = port });
+    performers.loadDefault() catch |err| {
+        std.log.err("performer file: {}", .{err});
+    };
+    if (performers.hasAccounts()) {
+        std.log.info("performer accounts loaded: {d}", .{performers.accountCount()});
+    } else {
+        std.log.info("no performer file; run performers.sh init", .{});
+    }
 
-    std.log.info("Routes: / /health /infer /rag /search", .{});
+    var dispatcher = TierDispatcher.init(allocator, &session, tier);
+    var srv = Server.init(allocator, &dispatcher, .{ .port = port, .host = "127.0.0.1" });
+
+    std.log.info("Routes: / /health /infer /rag /search /api/melos/*", .{});
     try srv.serve();
 }
