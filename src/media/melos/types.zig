@@ -69,7 +69,7 @@ pub const Key = struct {
     mode: Mode,
 };
 
-pub const Mode = enum { major, minor, dorian, mixolydian, /* … */ };
+pub const Mode = enum { major, minor, dorian, mixolydian, lydian, phrygian };
 
 pub const TimeSignature = struct {
     numerator: u8,
