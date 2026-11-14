@@ -4,6 +4,7 @@ import { encodePcm } from "./audio";
 import { createSong } from "./song";
 import { blankTrack, type Clip, type Expression, type Note, type Pedal, type Song, type StudioMode, type Track, type TrackKind, type WaveView } from "./types";
 import { applyDensity, clamp, interpretPrompt, quantizeBeat, scalePcs, sectionAt, stepScale, uid, vocalTrack } from "./theory";
+import type { EngineNote, GenerateTrack, ModTargets } from "@/lib/engine";
 
 export type UI = {
   mode: StudioMode;
@@ -50,6 +51,16 @@ type Melos = {
   addAuto: (beat: number, value: number) => void;
   clearAuto: () => void;
   applyPrompt: (text: string) => void;
+  applyEngineModulation: (prompt: string, result: { summary: string; applied: number; targets: ModTargets }) => void;
+  layerEngineNotes: (input: {
+    notes?: EngineNote[];
+    tracks?: GenerateTrack[];
+    ticksPerQuarter: number;
+    originBeat?: number;
+    label?: string;
+    tempoBpm?: number;
+    key?: string;
+  }) => void;
   addPedal: (pedal: Omit<Pedal, "id" | "status" | "enabled">) => void;
   setPedal: (id: string, partial: Partial<Pedal>) => void;
   selectClip: (id: string) => void;
@@ -329,6 +340,109 @@ export const useMelos = create<Melos>()(
           ui: { ...st.ui, status: `Crowd · ${read.effect}` },
         }));
       },
+      applyEngineModulation: (prompt, result) => {
+        const s = get();
+        const track = vocalTrack(s.song);
+        const targets = result.targets;
+        const summary = result.summary || "modulated";
+        const lower = summary.toLowerCase();
+        get().checkpoint();
+        const bpm = clamp(Math.round(targets.tempo_bpm), 40, 180);
+        const mode = targets.mode === "major" || targets.mode === "minor" ? targets.mode : s.song.mode;
+        if (track) {
+          const beat = s.ui.cursor;
+          const section = sectionAt(s.song, beat) ?? s.song.sections[0];
+          let notes = track.notes;
+          if (section && /higher register|lower register/.test(lower)) {
+            const dir = /lower/.test(lower) ? -1 : 1;
+            const steps = Math.max(1, Math.abs(targets.register) || 2);
+            const pcs = scalePcs(s.song.tonic, mode);
+            const end = section.start + section.bars * s.song.numerator;
+            notes = notes.map((n) => {
+              if (n.start < section.start || n.start >= end) return n;
+              let pitch = n.pitch;
+              for (let i = 0; i < steps; i++) pitch = stepScale(pitch, dir, pcs);
+              return { ...n, pitch };
+            });
+          }
+          if (section && /sparser|busier|busy/.test(lower)) {
+            notes = applyDensity(notes, section, s.song.numerator, /sparser/.test(lower) ? "sparse" : "busy");
+          }
+          const energy = clamp(targets.energy, 0, 1);
+          get().updateTrack(track.id, (t) => ({
+            ...t,
+            notes,
+            expression: { ...t.expression, energy },
+          }));
+        }
+        set((st) => ({
+          song: {
+            ...st.song,
+            bpm,
+            mode,
+            prompts: [{ id: uid("pr"), text: prompt, effect: `engine · ${summary}` }, ...st.song.prompts].slice(0, 12),
+          },
+          ui: { ...st.ui, status: `Engine · ${summary} · ${bpm} bpm` },
+        }));
+      },
+      layerEngineNotes: (input) => {
+        const tpq = Math.max(1, input.ticksPerQuarter || 480);
+        const origin = input.originBeat ?? get().ui.cursor ?? 0;
+        const bundles: { kind: TrackKind; events: EngineNote[] }[] = [];
+        if (input.tracks && input.tracks.length) {
+          for (const tr of input.tracks) {
+            bundles.push({ kind: kindFromRole(tr.role, tr.events[0]?.channel ?? 0), events: tr.events });
+          }
+        } else if (input.notes && input.notes.length) {
+          const byChan = new Map<number, EngineNote[]>();
+          for (const n of input.notes) {
+            const list = byChan.get(n.channel) ?? [];
+            list.push(n);
+            byChan.set(n.channel, list);
+          }
+          for (const [ch, events] of byChan) bundles.push({ kind: kindFromChannel(ch), events });
+        }
+        if (!bundles.length) {
+          get().setStatus("Engine returned no notes");
+          return;
+        }
+        get().checkpoint();
+        const toNotes = (events: EngineNote[]): Note[] =>
+          events.map((n) => ({
+            id: uid("n"),
+            pitch: clamp(Math.round(n.pitch), 0, 127),
+            start: origin + n.start_tick / tpq,
+            duration: Math.max(0.05, n.duration_ticks / tpq),
+            velocity: clamp(Math.round(n.velocity), 1, 127),
+            lyric: "la",
+          }));
+        let tracks = get().song.tracks;
+        let end = get().song.lengthBeats;
+        for (const bundle of bundles) {
+          const fresh = toNotes(bundle.events);
+          if (!fresh.length) continue;
+          end = Math.max(end, ...fresh.map((n) => n.start + n.duration), get().song.lengthBeats);
+          let id = tracks.find((t) => t.kind === bundle.kind)?.id;
+          if (!id) {
+            const created = blankTrack({ id: uid("tr"), name: labelForKind(bundle.kind), kind: bundle.kind });
+            id = created.id;
+            tracks = [...tracks, created];
+          }
+          tracks = tracks.map((t) => (t.id === id ? { ...t, notes: [...t.notes, ...fresh] } : t));
+        }
+        const parsed = parseKey(input.key);
+        set((st) => ({
+          song: {
+            ...st.song,
+            tracks,
+            lengthBeats: Math.max(st.song.lengthBeats, Math.ceil(end)),
+            bpm: input.tempoBpm ? clamp(Math.round(input.tempoBpm), 40, 180) : st.song.bpm,
+            tonic: parsed?.tonic ?? st.song.tonic,
+            mode: parsed?.mode ?? st.song.mode,
+          },
+          ui: { ...st.ui, status: input.label ?? "Engine notes layered" },
+        }));
+      },
       addPedal: (pedal) => {
         const full: Pedal = { ...pedal, id: uid("ped"), status: "pending", enabled: true };
         set((s) => ({ song: { ...s.song, pedals: [full, ...s.song.pedals] }, ui: { ...s.ui, status: `${full.name} waiting` } }));
@@ -413,3 +527,43 @@ export const useMelos = create<Melos>()(
     },
   ),
 );
+
+
+function kindFromChannel(channel: number): TrackKind {
+  if (channel === 2) return "bass";
+  if (channel === 1) return "pad";
+  if (channel === 9) return "drums";
+  return "vocal";
+}
+
+function kindFromRole(role: string, channel: number): TrackKind {
+  const r = role.toLowerCase();
+  if (r.includes("bass")) return "bass";
+  if (r.includes("pad") || r.includes("harmony") || r.includes("chord")) return "pad";
+  if (r.includes("drum")) return "drums";
+  if (r.includes("melody") || r.includes("lead") || r.includes("vocal")) return "vocal";
+  return kindFromChannel(channel);
+}
+
+function labelForKind(kind: TrackKind): string {
+  if (kind === "vocal") return "Voice";
+  if (kind === "pad") return "Pad";
+  if (kind === "bass") return "Bass";
+  if (kind === "drums") return "Pulse kit";
+  if (kind === "harmony") return "Harmony";
+  return "Tape";
+}
+
+function parseKey(key: string | undefined): { tonic: number; mode: "major" | "minor" } | undefined {
+  if (!key) return undefined;
+  const names = ["C", "C#", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"];
+  const m = key.trim().match(/^([A-G](?:#|b)?)\s*(major|minor)?/i);
+  if (!m) return undefined;
+  const raw = m[1]!.replace("b", "b");
+  const alias: Record<string, string> = { Db: "C#", Gb: "F#", D: "D", Bb: "Bb" };
+  const token = alias[raw] ?? raw;
+  const tonic = names.findIndex((n) => n.toLowerCase() === token.toLowerCase() || n === raw);
+  if (tonic < 0) return undefined;
+  const mode = (m[2] || "major").toLowerCase() === "minor" ? "minor" : "major";
+  return { tonic, mode };
+}

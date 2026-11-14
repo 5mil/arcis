@@ -37,6 +37,7 @@ import {
 } from "./audio";
 import { cursorBeat, renderMixdown, renderTrack, seek, stop, toggle, toggleMic } from "./engine";
 import { downloadBytes, lyricsDocument, songToMidi } from "./midi";
+import { runGenerateFromEngine, runLiveStep } from "./arcis-actions";
 import { useMelos } from "./store";
 import { formatClock, pitchName, vocalTrack } from "./theory";
 import type { TrackKind } from "./types";
@@ -169,6 +170,8 @@ export function getCommands(): Command[] {
     { id: "drums", group: "Tracks", label: "Add drum track", run: () => add("drums") },
     { id: "pad", group: "Tracks", label: "Add pad track", run: () => add("pad") },
     { id: "audio", group: "Tracks", label: "Add tape track", run: () => add("audio") },
+    { id: "engine-gen", group: "Generate", label: "Generate from engine", run: () => void runGenerateFromEngine() },
+    { id: "engine-step", group: "Live", label: "Engine live step", run: () => void runLiveStep() },
     { id: "tone", group: "Generate", label: "Generate tone", run: () => generate("tone") },
     { id: "noise", group: "Generate", label: "Generate noise", run: () => generate("noise") },
     { id: "silence", group: "Generate", label: "Generate silence", run: () => generate("silence") },
