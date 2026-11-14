@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from "react";
+import { hasPerformerToken, performerChangePassword, performerLogin, performerLogout, setPerformerToken, useArcis } from "@/lib/engine";
+import { runCrowdPrompt, runEnginePedalTransition, runLiveStep, runSubmitEnginePedal } from "@/lib/melos/arcis-actions";
 import { getMeter } from "@/lib/melos/engine";
 import { exportPacket } from "@/lib/melos/commands";
 import { useMelos } from "@/lib/melos/store";
@@ -20,6 +22,11 @@ export function LiveView() {
   const [name, setName] = useState("Hall breath");
   const [author, setAuthor] = useState("audience");
   const vocal = song.tracks.find((t) => t.kind === "vocal");
+  const link = useArcis((s) => s.link);
+  const caps = useArcis((s) => s.caps);
+  const signedIn = useArcis((s) => s.signedIn);
+  const crowdPedals = useArcis((s) => s.crowdPedals);
+  const canStep = signedIn || caps.step;
 
   useEffect(() => {
     const el = canvas.current;
@@ -65,7 +72,7 @@ export function LiveView() {
         </div>
       </div>
       <aside className="crowd">
-        <form className="stack" onSubmit={(e) => { e.preventDefault(); if (text.trim()) useMelos.getState().applyPrompt(text.trim()); }}>
+        <form className="stack" onSubmit={(e) => { e.preventDefault(); void runCrowdPrompt(text); }}>
           <label className="stack">
             <span className="mist">Crowd prompt</span>
             <input className="field" value={text} onChange={(e) => setText(e.target.value)} aria-label="Crowd prompt" />
@@ -74,7 +81,7 @@ export function LiveView() {
         </form>
         <div className="row">
           {["breathier", "lift the chorus", "darker", "sparser", "higher"].map((p) => (
-            <button key={p} className="btn" onClick={() => useMelos.getState().applyPrompt(p)}>{p}</button>
+            <button key={p} className="btn" onClick={() => void runCrowdPrompt(p)}>{p}</button>
           ))}
         </div>
         {song.prompts.map((p) => (
@@ -83,6 +90,32 @@ export function LiveView() {
             <div>{p.text}</div>
           </div>
         ))}
+        {canStep && (
+          <button className="btn btn-primary" type="button" onClick={() => void runLiveStep()}>
+            Engine live step
+          </button>
+        )}
+        {link === "connected" && (
+          <div className="panel stack">
+            <h3>Crowd pedals</h3>
+            <p className="mist">From the shared Arcis engine. Approve/activate stays on the performer route.</p>
+            {crowdPedals.length === 0 && <p className="mist">No crowd pedals yet.</p>}
+            {crowdPedals.map((p) => (
+              <div key={p.id} className="prompt">
+                <strong>{p.name}</strong>
+                <div className="mist">#{p.id} · {p.author} · {p.target_instrument} · {p.status}</div>
+                {signedIn && (
+                  <div className="row">
+                    <button className="btn btn-primary" type="button" onClick={() => void runEnginePedalTransition("approve", p.id)}>Approve</button>
+                    <button className="btn" type="button" onClick={() => void runEnginePedalTransition("activate", p.id)}>Activate</button>
+                    <button className="btn" type="button" onClick={() => void runEnginePedalTransition("reject", p.id)}>Reject</button>
+                    <button className="btn" type="button" onClick={() => void runEnginePedalTransition("deactivate", p.id)}>Deactivate</button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
         {vocal && (
           <div className="panel stack">
             <h3>Voice</h3>
@@ -143,6 +176,8 @@ export function LiveView() {
             <iframe className="kick" title="Kick stream" src={`https://player.kick.com/${encodeURIComponent(song.kickChannel)}`} allow="fullscreen" />
           )}
         </div>
+        <PerformerSignIn />
+        <PerformerTokenField />
       </aside>
     </div>
   );
@@ -155,7 +190,7 @@ function PedalForm({ name, author, setName, setAuthor }: { name: string; author:
   return (
     <form className="panel stack" onSubmit={(e) => {
       e.preventDefault();
-      useMelos.getState().addPedal({ name, author, target, breath, tension: 0, pitch: 0, reverb, formant: 0 });
+      void runSubmitEnginePedal({ name, author, target, reverb, breath });
     }}>
       <h3>Build a pedal</h3>
       <input className="field" aria-label="Pedal name" value={name} onChange={(e) => setName(e.target.value)} />
@@ -171,6 +206,134 @@ function PedalForm({ name, author, setName, setAuthor }: { name: string; author:
       <Slider label="Breath" min={-0.4} max={0.4} step={0.01} value={breath} onChange={setBreath} />
       <Slider label="Space" min={0} max={0.6} step={0.01} value={reverb} onChange={setReverb} />
       <button className="btn" type="submit">Submit pedal</button>
+    </form>
+  );
+}
+
+
+function PerformerSignIn() {
+  const signedIn = useArcis((s) => s.signedIn);
+  const performer = useArcis((s) => s.performer);
+  const [busy, setBusy] = useState(false);
+  const [changing, setChanging] = useState(false);
+
+  return (
+    <div className="panel stack performer-auth">
+      <h3>Performer sign-in</h3>
+      {signedIn ? (
+        <>
+          <p className="mist">Signed in as <strong>{performer || "performer"}</strong>. Generate, live step, and pedal approval use this session.</p>
+          {changing ? (
+            <form
+              className="stack"
+              onSubmit={(e) => {
+                e.preventDefault();
+                const data = new FormData(e.currentTarget);
+                const current = String(data.get("current") ?? "");
+                const next = String(data.get("next") ?? "");
+                const confirm = String(data.get("confirm") ?? "");
+                if (next !== confirm) {
+                  useMelos.getState().setStatus("New passwords do not match");
+                  return;
+                }
+                setBusy(true);
+                void performerChangePassword(current, next).then((result) => {
+                  setBusy(false);
+                  if (result.ok) {
+                    setChanging(false);
+                    useMelos.getState().setStatus("Password updated");
+                    e.currentTarget.reset();
+                  } else {
+                    useMelos.getState().setStatus(result.error || "Could not update password");
+                  }
+                });
+              }}
+            >
+              <input className="field" type="password" name="current" autoComplete="current-password" placeholder="current password" aria-label="Current password" required />
+              <input className="field" type="password" name="next" autoComplete="new-password" placeholder="new password" aria-label="New password" required minLength={8} />
+              <input className="field" type="password" name="confirm" autoComplete="new-password" placeholder="confirm new password" aria-label="Confirm new password" required minLength={8} />
+              <div className="row">
+                <button className="btn btn-primary" type="submit" disabled={busy}>Save password</button>
+                <button className="btn" type="button" onClick={() => setChanging(false)}>Cancel</button>
+              </div>
+            </form>
+          ) : (
+            <div className="row">
+              <button className="btn" type="button" onClick={() => setChanging(true)}>Change password</button>
+              <button
+                className="btn"
+                type="button"
+                disabled={busy}
+                onClick={() => {
+                  setBusy(true);
+                  void performerLogout().then(() => {
+                    setBusy(false);
+                    useMelos.getState().setStatus("Signed out");
+                  });
+                }}
+              >
+                Sign out
+              </button>
+            </div>
+          )}
+        </>
+      ) : (
+        <form
+          className="stack"
+          onSubmit={(e) => {
+            e.preventDefault();
+            const data = new FormData(e.currentTarget);
+            const username = String(data.get("username") ?? "").trim();
+            const password = String(data.get("password") ?? "");
+            if (!username || !password) {
+              useMelos.getState().setStatus("Enter a username and password");
+              return;
+            }
+            setBusy(true);
+            void performerLogin(username, password).then((result) => {
+              setBusy(false);
+              if (result.ok) {
+                useMelos.getState().setStatus(`Signed in as ${result.data.username ?? username}`);
+              } else if (result.status === 404) {
+                useMelos.getState().setStatus("Sign-in is not exposed yet (Caddy has not proxied the auth routes)");
+              } else {
+                useMelos.getState().setStatus(result.error || "Sign-in failed");
+              }
+            });
+          }}
+        >
+          <p className="mist">Sign in to enable generate, live step, and pedal approval. The token field below still works as a fallback.</p>
+          <input className="field" type="text" name="username" autoComplete="username" placeholder="username" aria-label="Performer username" required />
+          <input className="field" type="password" name="password" autoComplete="current-password" placeholder="password" aria-label="Performer password" required />
+          <button className="btn btn-primary" type="submit" disabled={busy}>Sign in</button>
+        </form>
+      )}
+    </div>
+  );
+}
+
+function PerformerTokenField() {
+  const [on, setOn] = useState(hasPerformerToken);
+  return (
+    <form
+      className="panel stack"
+      onSubmit={(e) => {
+        e.preventDefault();
+        const data = new FormData(e.currentTarget);
+        const value = String(data.get("token") ?? "");
+        setPerformerToken(value);
+        setOn(Boolean(value.trim()));
+        e.currentTarget.reset();
+        useMelos.getState().setStatus(value.trim() ? "Performer token stored for this session" : "Performer token cleared");
+      }}
+    >
+      <h3>Performer token</h3>
+      <p className="mist">
+        Optional. The engine only checks a JSON <code>token</code> field, and only when MELOS_PERFORMER_TOKEN is set on the server. Stored in this tab only, never sent until you use generate or live step.
+        {on ? " A token is stored in this session." : ""}
+      </p>
+      <input className="field" type="password" name="token" aria-label="Performer token" autoComplete="off" placeholder="optional" />
+      <button className="btn" type="submit">Store token</button>
     </form>
   );
 }

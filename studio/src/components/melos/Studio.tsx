@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Circle, Pause, Play, RotateCcw, Search, Square } from "lucide-react";
+import { startArcisBridge, useArcis } from "@/lib/engine";
 import { ensureCache, resetCache } from "@/lib/melos/audio";
 import { getCommands } from "@/lib/melos/commands";
 import { audition, cursorBeat, isPlaying, stop, subscribe, toggle, wireEngine } from "@/lib/melos/engine";
@@ -31,7 +32,11 @@ export function Studio() {
   const clock = useRef<HTMLSpanElement>(null);
   const playRef = useRef<HTMLButtonElement>(null);
 
+  const engineLink = useArcis((s) => s.link);
+  const engineDetail = useArcis((s) => s.detail);
+
   useEffect(() => {
+    const stopBridge = startArcisBridge();
     wireEngine();
     ensureCache(useMelos.getState().song.clips);
     const finish = useMelos.persist.onFinishHydration((state) => {
@@ -50,6 +55,7 @@ export function Studio() {
     return () => {
       unsub();
       finish();
+      stopBridge();
     };
   }, []);
 
@@ -160,6 +166,10 @@ export function Studio() {
       <footer className="statusbar">
         <span>{ui.status}</span>
         <span className="grow" />
+        <span className={`engine-pill ${engineLink}`} title={engineDetail} role="status">
+          <i aria-hidden="true" />
+          Engine: {engineLink === "connected" ? "connected" : "local"}
+        </span>
         <span>Oct {ui.octave}</span>
         <span>Keys A–K · Z/X octave · ⌘K commands</span>
       </footer>

@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 import { audition, seek, subscribe } from "@/lib/melos/engine";
+import { useArcis } from "@/lib/engine";
+import { runGenerateFromEngine } from "@/lib/melos/arcis-actions";
 import { useMelos } from "@/lib/melos/store";
 import { clamp, pitchName, quantizeBeat } from "@/lib/melos/theory";
 import type { Track } from "@/lib/melos/types";
@@ -26,6 +28,7 @@ export function SongView() {
   const track = song.tracks.find((t) => t.id === ui.trackId) ?? song.tracks[0];
   const selectTrack = useMelos((s) => s.selectTrack);
   const addTrack = useMelos((s) => s.addTrack);
+  const canGenerate = useArcis((s) => s.signedIn || s.caps.generate);
   const head = useRef<HTMLDivElement>(null);
   const head2 = useRef<HTMLDivElement>(null);
   const [lyrics, setLyrics] = useState("hold the lamp in the room");
@@ -110,6 +113,15 @@ export function SongView() {
           <input className="field grow" aria-label="Lyric line" value={lyrics} onChange={(e) => setLyrics(e.target.value)} />
           <button className="btn" onClick={() => useMelos.getState().layLyrics(lyrics)}>Lay lyrics</button>
           <button className="btn btn-primary" onClick={() => useMelos.getState().composeLine(lyrics)}>Write phrase</button>
+          <button
+            className="btn"
+            type="button"
+            disabled={!canGenerate}
+            title={canGenerate ? "Layer a phrase from the Arcis engine into this song" : "Sign in as a performer to generate from the engine"}
+            onClick={() => void runGenerateFromEngine()}
+          >
+            Generate from engine
+          </button>
           <button className="btn" onClick={() => useMelos.getState().quantize(0.25)}>Quantize</button>
           <button className="btn" onClick={() => useMelos.getState().humanize()}>Humanize</button>
           {track.kind === "drums" && <button className="btn" onClick={() => useMelos.getState().tileDrums()}>Tile bar</button>}
