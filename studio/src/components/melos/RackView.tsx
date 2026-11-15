@@ -2,7 +2,8 @@ import type { ReactNode } from "react";
 import { useMelos } from "@/lib/melos/store";
 import type { Bypass, Instrument, ModDest, ModSource, Track } from "@/lib/melos/types";
 import { Slider } from "./Studio";
-import { TEST_BANKS, voicebank } from "@/lib/melos/voicebanks";
+import { TEST_BANKS } from "@/lib/melos/voicebanks";
+import { BankCredit, FreeVoicePicker, activeTestBankId } from "./FreeVoices";
 
 const WAVES = ["Triangle", "Saw", "Square"];
 
@@ -106,7 +107,7 @@ export function RackView() {
               {TEST_BANKS.map((bank) => (
                 <button
                   key={bank.id}
-                  className={`btn ${voicebank(song.voicebank).id === bank.id ? "btn-on" : ""}`}
+                  className={`btn ${activeTestBankId(song.voicebank) === bank.id ? "btn-on" : ""}`}
                   onClick={() => {
                     useMelos.getState().patchSong({ voicebank: bank.id });
                     useMelos.getState().setStatus(`${bank.name} test bank`);
@@ -116,7 +117,8 @@ export function RackView() {
                 </button>
               ))}
             </div>
-            <p className="mist">{voicebank(song.voicebank).credit}</p>
+            <BankCredit id={song.voicebank} />
+            <FreeVoicePicker />
           </article>
         )}
         {track.voice && (
