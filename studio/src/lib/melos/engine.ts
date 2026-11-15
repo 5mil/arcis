@@ -2,6 +2,7 @@ import { audioRevision, bufferToMono, ensureCache, getRate, getSamples } from ".
 import { useMelos } from "./store";
 import { autoValue, clamp, sectionAt, swungStart } from "./theory";
 import type { Expression, Note, Song, Track } from "./types";
+import { ensureSampleBank, isFreeVoiceId, nearestSample, sampleBank, voiceVowel } from "./freevoices";
 import { voicebank, vowelFromLyric } from "./voicebanks";
 
 type Listener = (beat: number, playing: boolean, recording: boolean) => void;
@@ -492,7 +493,53 @@ function triggerDrum(ctx: BaseAudioContext, strip: Strip, when: number, pitch: n
   noise.stop(end);
 }
 
+function triggerSampleVoice(ctx: BaseAudioContext, strip: Strip, track: Track, song: Song, note: Note, when: number, dur: number): boolean {
+  const bankData = sampleBank(song.voicebank);
+  if (!bankData) return false;
+  const { expr, pitch } = voiced(song, track, note.start);
+  const pitchShift = pitch + resolved(track, "pitch", 0, note.velocity / 127) * 4;
+  const target = note.pitch + pitchShift;
+  const vowel = voiceVowel(bankData.voice, note.lyric, vowelFromLyric(note.lyric));
+  const sample = nearestSample(bankData, vowel, target);
+  if (!sample) return false;
+  const src = ctx.createBufferSource();
+  src.buffer = sample.buffer;
+  src.loop = true;
+  src.loopStart = sample.loopStart;
+  src.loopEnd = sample.loopEnd;
+  src.playbackRate.setValueAtTime(2 ** ((target - sample.midi) / 12), when);
+  const vib = ctx.createOscillator();
+  vib.frequency.value = 4.6 + expr.energy * 1.6;
+  const vibGain = ctx.createGain();
+  const depth = 4 + expr.vibrato * 34;
+  vibGain.gain.setValueAtTime(0, when);
+  vibGain.gain.linearRampToValueAtTime(depth, when + 0.35);
+  vib.connect(vibGain);
+  vibGain.connect(src.detune);
+  const tilt = ctx.createBiquadFilter();
+  tilt.type = "highshelf";
+  tilt.frequency.value = 2400;
+  tilt.gain.value = clamp(expr.formant, -12, 12) * 0.6 + (expr.tension - 0.5) * 4;
+  const level = (0.16 + expr.power * 0.2) * 1.5 * clamp(note.velocity / 127, 0.08, 1) * (0.85 + expr.energy * 0.3);
+  const attack = 0.03 + (1 - expr.tension) * 0.05;
+  const { amp, end } = gainEnv(ctx, when, level, attack, Math.max(attack + 0.05, dur * 0.8), dur + 0.04);
+  src.connect(tilt);
+  tilt.connect(amp);
+  connectSource(amp, strip);
+  arm(src, when);
+  arm(vib, when);
+  src.stop(end + 0.02);
+  vib.stop(end + 0.02);
+  return true;
+}
+
 function triggerVoice(ctx: BaseAudioContext, strip: Strip, track: Track, song: Song, note: Note, when: number, dur: number) {
+  if (isFreeVoiceId(song.voicebank)) {
+    if (triggerSampleVoice(ctx, strip, track, song, note, when, dur)) return;
+    // Samples not loaded yet: start loading and sing this note with the built-in Lamp synth.
+    void ensureSampleBank(song.voicebank);
+    song = { ...song, voicebank: "lamp" };
+  }
   const bank = voicebank(song.voicebank);
   const peaks = bank.vowels[vowelFromLyric(note.lyric)];
   const { expr, pitch } = voiced(song, track, note.start);
@@ -747,9 +794,15 @@ function ensurePump() {
   raf = requestAnimationFrame(loop);
 }
 
+async function readyVoice() {
+  const id = songNow().voicebank;
+  if (isFreeVoiceId(id)) await ensureSampleBank(id);
+}
+
 export async function toggle() {
   const ctx = context();
   if (!ctx || !master) return;
+  if (!playing) await readyVoice();
   if (ctx.state === "suspended") await ctx.resume();
   syncAll();
   const spb = spbOf(songNow());
@@ -790,6 +843,7 @@ export function seek(beat: number) {
 export async function audition(pitch: number) {
   const ctx = context();
   if (!ctx || !master) return;
+  await readyVoice();
   if (ctx.state === "suspended") await ctx.resume();
   syncAll();
   const song = songNow();
@@ -844,6 +898,7 @@ export async function toggleMic() {
 }
 
 async function renderOffline(onlyId: string | null) {
+  await readyVoice();
   const song = songNow();
   ensureCache(song.clips);
   const rate = 44100;
@@ -898,6 +953,8 @@ export function wireEngine() {
   wired = true;
   useMelos.subscribe((state, prev) => {
     if (state.song !== prev.song && audio) syncAll();
+    if (state.song.voicebank !== prev.song.voicebank && isFreeVoiceId(state.song.voicebank)) void ensureSampleBank(state.song.voicebank);
   });
+  if (isFreeVoiceId(songNow().voicebank)) void ensureSampleBank(songNow().voicebank);
   ensurePump();
 }

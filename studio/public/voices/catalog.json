@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "note": "Rendered vowel multisamples from free voicebanks. Bank files themselves are never hosted here; only audio rendered from them offline.",
+  "voices": [
+    {
+      "id": "ritsu",
+      "name": "Namine Ritsu",
+      "native": "波音リツ",
+      "kind": "samples",
+      "languages": ["ja"],
+      "languageNote": "Japanese vowels a i u e o. English lyrics use the nearest vowel.",
+      "vowels": ["a", "i", "u", "e", "o"],
+      "vowelLabels": { "a": "ah", "i": "ee", "u": "oo", "e": "eh", "o": "oh" },
+      "license": {
+        "summary": "Commercial and non-commercial use allowed without permission, redistribution allowed, credit not required.",
+        "termsUrl": "https://www.canon-voice.com/terms/",
+        "commercial": true,
+        "attributionRequired": false
+      },
+      "credit": {
+        "text": "Namine Ritsu (波音リツ) · voice by Canon · rendered samples from the UTAU 連続音 Ver1.5.1 bank",
+        "url": "https://www.canon-voice.com/"
+      },
+      "source": {
+        "name": "Namine Ritsu UTAU (normal, Ver1.5.1)",
+        "url": "https://www.canon-voice.com/voicebanks/"
+      }
+    },
+    {
+      "id": "kumi",
+      "name": "Hitsune Kumi English",
+      "native": "筆音クミ",
+      "kind": "samples",
+      "languages": ["en"],
+      "languageNote": "English vowels ah, ae, eh, ih, ee, oo, uh, aw chosen from the lyric spelling.",
+      "vowels": ["a", "ae", "e", "i", "ee", "oo", "u", "aw"],
+      "vowelLabels": { "a": "ah", "ae": "ae", "e": "eh", "i": "ih", "ee": "ee", "oo": "oo", "u": "uh", "aw": "aw" },
+      "license": {
+        "summary": "Commercial use of the voice allowed without permission. Redistribution of the bank requires crediting Cubialpha and linking the official site; no selling or paywalling the bank. Samples here are rendered audio only.",
+        "termsUrl": "https://cubialpha.wixsite.com/kumivoice/character",
+        "commercial": true,
+        "attributionRequired": true
+      },
+      "credit": {
+        "text": "Hitsune Kumi (筆音クミ) English VCCV · voice by Cubialpha · rendered samples",
+        "url": "https://cubialpha.wixsite.com/kumivoice"
+      },
+      "source": {
+        "name": "Hitsune Kumi - English (VCCV UTAU)",
+        "url": "https://cubialpha.wixsite.com/kumivoice"
+      }
+    }
+  ]
+}
