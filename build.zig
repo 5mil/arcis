@@ -1,7 +1,8 @@
 //! build.zig — Arcis engine build script
-//! Compatible with Zig 0.14 and 0.15+
+//! Compatible with Zig 0.16+
 //! Uses root_module so it works after the 0.15 removal of the deprecated
 //! root_source_file field on ExecutableOptions / TestOptions.
+//! Zig 0.16 renamed TestOptions.filter to filters ([]const []const u8).
 
 const std = @import("std");
 
@@ -179,7 +180,8 @@ pub fn build(b: *std.Build) void {
         const t = b.addTest(.{
             .name = sys.name,
             .root_module = test_mod,
-            .filter = test_filter,
+            // Zig 0.16: filter -> filters ([]const []const u8)
+            .filters = if (test_filter) |f| &.{f} else &.{},
         });
 
         const run_t = b.addRunArtifact(t);
