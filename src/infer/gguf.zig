@@ -1,6 +1,4 @@
 const std = @import("std");
-const DType = @import("../core/dtype.zig").DType;
-const Shape = @import("../core/shape.zig").Shape;
 
 /// GGUF magic bytes: 0x47 0x47 0x55 0x46
 pub const GGUF_MAGIC: u32 = 0x46554747;
