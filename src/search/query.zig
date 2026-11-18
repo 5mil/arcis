@@ -2,6 +2,7 @@
 //! Phase 10 — src/search/
 
 const std = @import("std");
+const ArrayList = std.array_list.Managed;
 const Allocator  = std.mem.Allocator;
 const common     = @import("common");
 const EntityId   = common.EntityId;
@@ -54,7 +55,7 @@ pub const QueryEngine = struct {
     }
 
     fn runKeyword(self: *QueryEngine, q: Query) ![]SearchResult {
-        var ids = std.ArrayList(EntityId).init(self.allocator);
+        var ids = ArrayList(EntityId).init(self.allocator);
         defer ids.deinit();
         try self.index.searchKeyword(q.text, &ids);
         const results = try self.allocator.alloc(SearchResult, @min(ids.items.len, q.top_k));
