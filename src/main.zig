@@ -4,10 +4,10 @@
 //! filesystem APIs live on std.Io.Dir / std.Io.File).
 
 const std = @import("std");
-const ArcisSession   = @import("dashboard/arcis_session.zig").ArcisSession;
-const Server         = @import("api/server.zig").Server;
-const ServerConfig   = @import("api/server.zig").ServerConfig;
-const TierDispatcher = @import("api/tier.zig").TierDispatcher;
+const ArcisSession   = @import("dashboard").ArcisSession;
+const Server         = @import("api").Server;
+const ServerConfig   = @import("api").ServerConfig;
+const TierDispatcher = @import("api").TierDispatcher;
 
 const HOUSE_GGUF = "models/gguf/DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M.gguf";
 
