@@ -76,6 +76,12 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
+    const media_mod = b.createModule(.{
+        .root_source_file = b.path("src/media/root.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+
     // Dashboard + api form a cycle (session holds dispatcher; dispatcher holds session).
     // Create both first, then cross-link imports.
     const dashboard_mod = b.createModule(.{
@@ -99,6 +105,7 @@ pub fn build(b: *std.Build) void {
     api_mod.addImport("dashboard", dashboard_mod);
     api_mod.addImport("naming", naming_mod);
     api_mod.addImport("workflow", workflow_mod);
+    api_mod.addImport("media", media_mod);
 
     // Break the cycle: dashboard needs api for TierDispatcher
     dashboard_mod.addImport("api", api_mod);
@@ -120,6 +127,7 @@ pub fn build(b: *std.Build) void {
     exe_mod.addImport("infer", infer_mod);
     exe_mod.addImport("dashboard", dashboard_mod);
     exe_mod.addImport("api", api_mod);
+    exe_mod.addImport("media", media_mod);
 
     const exe = b.addExecutable(.{
         .name = "arcis",
@@ -186,6 +194,7 @@ pub fn build(b: *std.Build) void {
             test_mod.addImport("dashboard", dashboard_mod);
             test_mod.addImport("naming", naming_mod);
             test_mod.addImport("workflow", workflow_mod);
+            test_mod.addImport("media", media_mod);
         }
         if (std.mem.eql(u8, sys.name, "search") or std.mem.eql(u8, sys.name, "rag")) {
             test_mod.addImport("rag", rag_mod);
