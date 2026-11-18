@@ -81,13 +81,13 @@ fn handleConn(ctx: *ConnContext) void {
 
 fn serveConn(ctx: *ConnContext) !void {
     const allocator = ctx.server.allocator;
-    const io = ctx.server.io;
+    const fd = ctx.stream.socket.handle;
 
-    var read_buf: [4096]u8 = undefined;
-    var reader = ctx.stream.reader(io, &read_buf);
-    const n = try reader.interface.read(&read_buf);
-    if (n == 0) return;
-    const raw = read_buf[0..n];
+    var buf: [8192]u8 = undefined;
+    const n_raw = std.c.read(fd, &buf, buf.len);
+    if (n_raw <= 0) return;
+    const n: usize = @intCast(n_raw);
+    const raw = buf[0..n];
 
     // Parse request line: "METHOD /path HTTP/1.1\r\n"
     var lines = std.mem.splitSequence(u8, raw, "\r\n");
@@ -128,9 +128,8 @@ fn serveConn(ctx: *ConnContext) !void {
     );
     defer allocator.free(header);
 
-    var write_buf: [512]u8 = undefined;
-    var writer = ctx.stream.writer(io, &write_buf);
-    try writer.interface.writeAll(header);
-    try writer.interface.writeAll(resp.body);
-    try writer.interface.flush();
+    _ = std.c.write(fd, header.ptr, header.len);
+    if (resp.body.len > 0) {
+        _ = std.c.write(fd, resp.body.ptr, resp.body.len);
+    }
 }
