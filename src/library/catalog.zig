@@ -4,6 +4,7 @@
 
 const std = @import("std");
 const Allocator  = std.mem.Allocator;
+const ArrayList  = std.array_list.Managed;
 const common     = @import("common");
 const TextRecord = common.TextRecord;
 const Concept    = common.Concept;
@@ -20,11 +21,11 @@ const ImportMeta = import_mod.ImportMeta;
 
 /// Maps tag string → list of TextRecord IDs.
 pub const TagIndex = struct {
-    map:       std.StringHashMap(std.ArrayList(EntityId)),
+    map:       std.StringHashMap(ArrayList(EntityId)),
     allocator: Allocator,
 
     pub fn init(allocator: Allocator) TagIndex {
-        return .{ .map = std.StringHashMap(std.ArrayList(EntityId)).init(allocator), .allocator = allocator };
+        return .{ .map = std.StringHashMap(ArrayList(EntityId)).init(allocator), .allocator = allocator };
     }
 
     pub fn deinit(self: *TagIndex) void {
@@ -36,7 +37,7 @@ pub const TagIndex = struct {
     pub fn index(self: *TagIndex, tag: []const u8, id: EntityId) !void {
         const gop = try self.map.getOrPut(tag);
         if (!gop.found_existing) {
-            gop.value_ptr.* = std.ArrayList(EntityId).init(self.allocator);
+            gop.value_ptr.* = ArrayList(EntityId).init(self.allocator);
         }
         try gop.value_ptr.append(id);
     }
@@ -108,7 +109,7 @@ pub const Catalog = struct {
     pub fn findByLanguage(
         self: *Catalog,
         lang: []const u8,
-        out: *std.ArrayList(EntityId),
+        out: *ArrayList(EntityId),
     ) !void {
         for (self.texts.items.items) |t| {
             if (std.mem.eql(u8, t.language, lang)) try out.append(t.id);
@@ -119,7 +120,7 @@ pub const Catalog = struct {
     pub fn findByTradition(
         self: *Catalog,
         tradition: []const u8,
-        out: *std.ArrayList(EntityId),
+        out: *ArrayList(EntityId),
     ) !void {
         for (self.texts.items.items) |t| {
             if (std.mem.eql(u8, t.source_tradition, tradition)) try out.append(t.id);
