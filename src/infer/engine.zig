@@ -12,6 +12,12 @@ const Tokenizer = @import("tokenizer.zig").Tokenizer;
 const Session = @import("session.zig").Session;
 const sampler = @import("sampler.zig");
 
+fn milliTimestamp() i64 {
+    var ts: std.c.timespec = undefined;
+    _ = std.c.clock_gettime(.REALTIME, &ts);
+    return @as(i64, @intCast(ts.sec)) * 1000 + @divTrunc(@as(i64, @intCast(ts.nsec)), 1_000_000);
+}
+
 /// Owns everything needed for inference.
 pub const InferenceEngine = struct {
     model:    Model,
@@ -62,7 +68,7 @@ pub const InferenceEngine = struct {
             &self.weights,
             self.cfg,
             sampler_cfg,
-            @intCast(std.time.milliTimestamp()),
+            @intCast(milliTimestamp()),
         );
 
         self.loaded = true;
