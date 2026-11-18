@@ -1,6 +1,7 @@
 //! Naive library scan — no embeddings yet.
 const std = @import("std");
 const Allocator = std.mem.Allocator;
+const ArrayList = std.array_list.Managed;
 const Request = @import("server.zig").Request;
 const Response = @import("server.zig").Response;
 const ArcisSession = @import("dashboard").ArcisSession;
@@ -14,34 +15,11 @@ fn jsonGetString(body: []const u8, key: []const u8) ?[]const u8 {
     return body[val_start..end];
 }
 
-pub fn run(allocator: Allocator, req: *Request, _: *ArcisSession) !Response {
+pub fn run(allocator: Allocator, req: *Request, session: *ArcisSession) !Response {
     const query = jsonGetString(req.body, "query") orelse "algebra";
-    var hits = std.ArrayList(u8).init(allocator);
-    defer hits.deinit();
-    try hits.appendSlice("{\"query\":\"");
-    try hits.appendSlice(query);
-    try hits.appendSlice("\",\"files\":[");
-
-    var dir = std.fs.cwd().openDir("data/library", .{ .iterate = true }) catch {
-        const body = try allocator.dupe(u8, "{\"result\":\"no data/library — copy OpenStax txt here\"}");
-        return Response{ .status = 200, .body = body, .allocator = allocator };
-    };
-    defer dir.close();
-
-    var it = dir.iterate();
-    var first = true;
-    var n: usize = 0;
-    while (it.next() catch null) |ent| {
-        if (ent.kind != .file) continue;
-        if (n >= 8) break;
-        const name = ent.name;
-        if (!first) try hits.appendSlice(",");
-        first = false;
-        try hits.appendSlice("\"");
-        try hits.appendSlice(name);
-        try hits.appendSlice("\"");
-        n += 1;
-    }
-    try hits.appendSlice("]}");
-    return Response{ .status = 200, .body = try hits.toOwnedSlice(), .allocator = allocator };
+    _ = session;
+    // Zig 0.16: std.fs.cwd removed — return stub until Io.Dir scan is wired.
+    const body = try std.fmt.allocPrint(allocator,
+        "{{\"query\":\"{s}\",\"files\":[],\"note\":\"library scan needs Io.Dir in 0.16\"}}", .{query});
+    return Response{ .status = 200, .body = body, .allocator = allocator };
 }
