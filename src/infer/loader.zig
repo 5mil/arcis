@@ -20,7 +20,8 @@ pub const MappedFile = struct {
         if (fd < 0) return error.FileNotFound;
         errdefer _ = std.c.close(fd);
 
-        const st = try std.posix.fstat(fd);
+        var st: std.c.Stat = undefined;
+        if (std.c.fstat(fd, &st) != 0) return error.StatFailed;
         const size: usize = @intCast(st.size);
         if (size == 0) return error.EmptyFile;
 
