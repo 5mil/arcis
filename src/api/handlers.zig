@@ -3,9 +3,16 @@
 
 const std       = @import("std");
 const Allocator = std.mem.Allocator;
+const ArrayList = std.array_list.Managed;
 const Request   = @import("server.zig").Request;
 const Response  = @import("server.zig").Response;
 const ArcisSession = @import("dashboard").ArcisSession;
+
+fn milliTimestamp() i64 {
+    var ts: std.c.timespec = undefined;
+    _ = std.c.clock_gettime(.REALTIME, &ts);
+    return @as(i64, @intCast(ts.sec)) * 1000 + @divTrunc(@as(i64, @intCast(ts.nsec)), 1_000_000);
+}
 
 // ---------------------------------------------------------------------------
 // Health
@@ -48,7 +55,7 @@ pub fn handleInfer(allocator: Allocator, req: *Request, session: *ArcisSession) 
     defer allocator.free(result);
 
     // Escape for JSON
-    var escaped = std.ArrayList(u8).init(allocator);
+    var escaped = ArrayList(u8).init(allocator);
     defer escaped.deinit();
     for (result) |c| {
         switch (c) {
@@ -90,11 +97,11 @@ pub fn handleSearch(allocator: Allocator, req: *Request, session: *ArcisSession)
         queryParam(req.path, "q") orelse
         return badRequest(allocator, "missing q");
 
-    var ids = std.ArrayList(u64).init(allocator);
+    var ids = ArrayList(u64).init(allocator);
     defer ids.deinit();
     session.search.keyword.search(q, &ids) catch {};
 
-    var buf = std.ArrayList(u8).init(allocator);
+    var buf = ArrayList(u8).init(allocator);
     defer buf.deinit();
     try buf.appendSlice("{\"results\":[");
     for (ids.items, 0..) |id, i| {
@@ -125,7 +132,7 @@ pub fn handleName(allocator: Allocator, req: *Request, session: *ArcisSession) !
     const trad = std.meta.stringToEnum(Tradition, trad_s) orelse .greek;
     const rank = std.meta.stringToEnum(Rank,      rank_s) orelse .adept;
 
-    const seed: u64 = @intCast(std.time.milliTimestamp());
+    const seed: u64 = @intCast(milliTimestamp());
     const id   = try session.names.generateAndStore(kind, trad, rank, seed);
     const rec  = session.names.getById(id) orelse return internalError(allocator);
 
