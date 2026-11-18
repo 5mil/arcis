@@ -48,11 +48,19 @@ pub fn build(b: *std.Build) void {
     });
     naming_mod.addImport("common", common_mod);
 
+    // infer before rag (rag/embedder imports infer)
+    const infer_mod = b.createModule(.{
+        .root_source_file = b.path("src/infer/root.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+
     const rag_mod = b.createModule(.{
         .root_source_file = b.path("src/rag/root.zig"),
         .target = target,
         .optimize = optimize,
     });
+    rag_mod.addImport("infer", infer_mod);
 
     const search_mod = b.createModule(.{
         .root_source_file = b.path("src/search/index.zig"),
@@ -64,12 +72,6 @@ pub fn build(b: *std.Build) void {
 
     const workflow_mod = b.createModule(.{
         .root_source_file = b.path("src/workflow/root.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-
-    const infer_mod = b.createModule(.{
-        .root_source_file = b.path("src/infer/engine.zig"),
         .target = target,
         .optimize = optimize,
     });
@@ -185,8 +187,9 @@ pub fn build(b: *std.Build) void {
             test_mod.addImport("naming", naming_mod);
             test_mod.addImport("workflow", workflow_mod);
         }
-        if (std.mem.eql(u8, sys.name, "search")) {
+        if (std.mem.eql(u8, sys.name, "search") or std.mem.eql(u8, sys.name, "rag")) {
             test_mod.addImport("rag", rag_mod);
+            test_mod.addImport("infer", infer_mod);
         }
 
         const t = b.addTest(.{
