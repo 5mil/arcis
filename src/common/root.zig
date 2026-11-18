@@ -1,6 +1,8 @@
 //! root.zig — re-export for the "common" named module
 //! Allows tests rooted in subdirectories to import shared types without relative path issues.
 
+const std = @import("std");
+
 pub const EntityId = @import("id.zig").EntityId;
 pub const EntityKind = @import("id.zig").EntityKind;
 pub const IdSequence = @import("id.zig").IdSequence;
@@ -16,3 +18,10 @@ pub const TextRecord = @import("schema.zig").TextRecord;
 pub const Annotation = @import("schema.zig").Annotation;
 
 pub const EntityStore = @import("store.zig").EntityStore;
+
+/// Wall-clock milliseconds since Unix epoch (Zig 0.16: std.time.milliTimestamp removed).
+pub fn milliTimestamp() i64 {
+    var ts: std.c.timespec = undefined;
+    _ = std.c.clock_gettime(.REALTIME, &ts);
+    return @as(i64, @intCast(ts.sec)) * 1000 + @divTrunc(@as(i64, @intCast(ts.nsec)), 1_000_000);
+}
