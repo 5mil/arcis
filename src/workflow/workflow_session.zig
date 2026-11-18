@@ -15,6 +15,12 @@ const Job          = @import("job.zig").Job;
 const Scheduler    = @import("scheduler.zig").Scheduler;
 const Runner       = @import("runner.zig").Runner;
 
+fn milliTimestamp() i64 {
+    var ts: std.c.timespec = undefined;
+    _ = std.c.clock_gettime(.REALTIME, &ts);
+    return @as(i64, @intCast(ts.sec)) * 1000 + @divTrunc(@as(i64, @intCast(ts.nsec)), 1_000_000);
+}
+
 // ---------------------------------------------------------------------------
 // Workflow definition
 // ---------------------------------------------------------------------------
@@ -105,7 +111,7 @@ pub const WorkflowSession = struct {
 
     /// Fire a named event — triggers all workflows subscribed to it.
     pub fn fireEvent(self: *WorkflowSession, event_name: []const u8) !void {
-        const now = @divFloor(std.time.milliTimestamp(), 1000);
+        const now = @divFloor(milliTimestamp(), 1000);
         try self.scheduler.fireEvent(event_name, now);
         const dispatches = self.scheduler.drain();
         for (dispatches) |d| {
