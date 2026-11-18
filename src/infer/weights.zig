@@ -1,5 +1,6 @@
 //! Load GGUF tensors into f32 TransformerWeights (F32/F16/Q4_0/Q8_0/Q4_K).
 const std = @import("std");
+const ArrayList = std.array_list.Managed;
 const Model = @import("model.zig").Model;
 const gguf = @import("gguf.zig");
 const dequant = @import("dequant.zig");
@@ -62,7 +63,7 @@ pub fn loadWeights(
     const n = cfg.n_layers;
     var layers = try allocator.alloc(LayerWeights, n);
     errdefer allocator.free(layers);
-    var allocated = std.ArrayList([]f32).init(allocator);
+    var allocated = ArrayList([]f32).init(allocator);
     defer allocated.deinit();
 
     const embed = try tensorToF32(allocator, model, "token_embd.weight");
