@@ -5,6 +5,7 @@
 
 const std = @import("std");
 const Allocator  = std.mem.Allocator;
+const ArrayList  = std.array_list.Managed;
 const common     = @import("common");
 const EntityId   = common.EntityId;
 const rag        = @import("rag");
@@ -28,11 +29,11 @@ pub const SearchResult = struct {
 // ---------------------------------------------------------------------------
 
 pub const KeywordIndex = struct {
-    map:       std.StringHashMap(std.ArrayList(EntityId)),
+    map:       std.StringHashMap(ArrayList(EntityId)),
     allocator: Allocator,
 
     pub fn init(allocator: Allocator) KeywordIndex {
-        return .{ .map = std.StringHashMap(std.ArrayList(EntityId)).init(allocator), .allocator = allocator };
+        return .{ .map = std.StringHashMap(ArrayList(EntityId)).init(allocator), .allocator = allocator };
     }
 
     pub fn deinit(self: *KeywordIndex) void {
@@ -48,7 +49,7 @@ pub const KeywordIndex = struct {
             if (word.len < 2) continue;
             const gop = try self.map.getOrPut(word);
             if (!gop.found_existing)
-                gop.value_ptr.* = std.ArrayList(EntityId).init(self.allocator);
+                gop.value_ptr.* = ArrayList(EntityId).init(self.allocator);
             // Avoid duplicate entries per document.
             var found = false;
             for (gop.value_ptr.items) |id| { if (id == entity_id) { found = true; break; } }
@@ -57,7 +58,7 @@ pub const KeywordIndex = struct {
     }
 
     /// Keyword search: returns all entity IDs matching the query word.
-    pub fn search(self: *KeywordIndex, word: []const u8, out: *std.ArrayList(EntityId)) !void {
+    pub fn search(self: *KeywordIndex, word: []const u8, out: *ArrayList(EntityId)) !void {
         const list = self.map.get(word) orelse return;
         try out.appendSlice(list.items);
     }
@@ -100,7 +101,7 @@ pub const UnifiedSearchIndex = struct {
     pub fn searchKeyword(
         self: *UnifiedSearchIndex,
         query: []const u8,
-        out: *std.ArrayList(EntityId),
+        out: *ArrayList(EntityId),
     ) !void {
         var words = std.mem.tokenizeAny(u8, query, " \t\n");
         while (words.next()) |word| {
@@ -128,7 +129,7 @@ test "KeywordIndex index and search" {
     defer ki.deinit();
     try ki.indexDocument(1, "The logos of being");
     try ki.indexDocument(2, "The eidos of becoming");
-    var out = std.ArrayList(EntityId).init(allocator);
+    var out = ArrayList(EntityId).init(allocator);
     defer out.deinit();
     try ki.search("logos", &out);
     try std.testing.expectEqual(@as(usize, 1), out.items.len);
