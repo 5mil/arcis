@@ -4,6 +4,7 @@
 
 const std = @import("std");
 const Allocator = std.mem.Allocator;
+const ArrayList = std.array_list.Managed;
 const NodeId = @import("graph.zig").NodeId;
 
 // ---------------------------------------------------------------------------
@@ -47,11 +48,11 @@ pub const NodeRunner = struct {
 
 /// Global node runner registry.
 pub const NodeRegistry = struct {
-    runners:   std.ArrayList(NodeRunner),
+    runners:   ArrayList(NodeRunner),
     allocator: Allocator,
 
     pub fn init(allocator: Allocator) NodeRegistry {
-        return .{ .runners = std.ArrayList(NodeRunner).init(allocator), .allocator = allocator };
+        return .{ .runners = ArrayList(NodeRunner).init(allocator), .allocator = allocator };
     }
 
     pub fn deinit(self: *NodeRegistry) void {
