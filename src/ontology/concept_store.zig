@@ -4,6 +4,7 @@
 
 const std = @import("std");
 const Allocator  = std.mem.Allocator;
+const ArrayList  = std.array_list.Managed;
 const common     = @import("common");
 const Concept    = common.Concept;
 const Relation   = common.Relation;
@@ -14,6 +15,10 @@ const EntityId   = common.EntityId;
 const IdSequence = common.IdSequence;
 const makeUrn    = common.makeUrn;
 const URN_BUF_SIZE = common.URN_BUF_SIZE;
+
+fn milliTimestamp() i64 {
+    return common.milliTimestamp();
+}
 
 // ---------------------------------------------------------------------------
 // ConceptStore
@@ -58,7 +63,7 @@ pub const ConceptStore = struct {
         const id  = self.seq.next(.concept);
         var urn_buf: [URN_BUF_SIZE]u8 = undefined;
         const urn = try self.allocator.dupe(u8, makeUrn(.concept, id, &urn_buf));
-        const now = std.time.milliTimestamp();
+        const now = milliTimestamp();
         try self.concepts.put(.{
             .id          = id,
             .urn         = urn,
@@ -93,20 +98,20 @@ pub const ConceptStore = struct {
             .kind       = kind,
             .status     = .validated,
             .note       = note,
-            .created_at = std.time.milliTimestamp(),
+            .created_at = milliTimestamp(),
         });
         return id;
     }
 
     /// Return all relations where src_id == id.
-    pub fn relationsFrom(self: *ConceptStore, id: EntityId, out: *std.ArrayList(Relation)) !void {
+    pub fn relationsFrom(self: *ConceptStore, id: EntityId, out: *ArrayList(Relation)) !void {
         for (self.relations.items.items) |r| {
             if (r.src_id == id) try out.append(r);
         }
     }
 
     /// Return all relations where dst_id == id.
-    pub fn relationsTo(self: *ConceptStore, id: EntityId, out: *std.ArrayList(Relation)) !void {
+    pub fn relationsTo(self: *ConceptStore, id: EntityId, out: *ArrayList(Relation)) !void {
         for (self.relations.items.items) |r| {
             if (r.dst_id == id) try out.append(r);
         }
@@ -117,7 +122,7 @@ pub const ConceptStore = struct {
         const c = self.concepts.getById(id) orelse return false;
         if (!c.modifiable) return false;
         c.status = status;
-        c.updated_at = std.time.milliTimestamp();
+        c.updated_at = milliTimestamp();
         return true;
     }
 
@@ -155,7 +160,7 @@ test "ConceptStore relation" {
     const b = try cs.addConcept("becoming", "change", "metaphysics", .validated, true);
     _ = try cs.addRelation(a, b, .contrasts, "");
 
-    var out = std.ArrayList(Relation).init(allocator);
+    var out = ArrayList(Relation).init(allocator);
     defer out.deinit();
     try cs.relationsFrom(a, &out);
     try std.testing.expectEqual(@as(usize, 1), out.items.len);
