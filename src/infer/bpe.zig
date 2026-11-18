@@ -1,5 +1,6 @@
 const std = @import("std");
 const Vocab = @import("vocab.zig").Vocab;
+const ArrayList = std.array_list.Managed;
 
 /// A single BPE merge rule: merge (left, right) → merged token.
 pub const MergeRule = struct {
@@ -12,14 +13,14 @@ pub const MergeRule = struct {
 
 /// BPE merge table: ordered list of merge rules.
 pub const MergeTable = struct {
-    rules: std.ArrayList(MergeRule),
+    rules: ArrayList(MergeRule),
     /// Fast lookup: "left right" → rank
     pair_rank: std.StringHashMap(u32),
     allocator: std.mem.Allocator,
 
     pub fn init(allocator: std.mem.Allocator) MergeTable {
         return .{
-            .rules      = std.ArrayList(MergeRule).init(allocator),
+            .rules      = ArrayList(MergeRule).init(allocator),
             .pair_rank  = std.StringHashMap(u32).init(allocator),
             .allocator  = allocator,
         };
@@ -83,10 +84,10 @@ pub fn mergeSymbols(
     symbols: [][]u8,
     table: *const MergeTable,
     allocator: std.mem.Allocator,
-    out: *std.ArrayList([]u8),
+    out: *ArrayList([]u8),
 ) !void {
     // Work on a mutable copy of the symbol list.
-    var seq = try std.ArrayList([]u8).initCapacity(allocator, symbols.len);
+    var seq = try ArrayList([]u8).initCapacity(allocator, symbols.len);
     defer seq.deinit();
     for (symbols) |s| try seq.append(s);
 
