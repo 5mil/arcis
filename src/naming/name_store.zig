@@ -3,6 +3,7 @@
 
 const std = @import("std");
 const Allocator  = std.mem.Allocator;
+const ArrayList  = std.array_list.Managed;
 const common     = @import("common");
 const EntityId   = common.EntityId;
 const IdSequence = common.IdSequence;
@@ -36,14 +37,14 @@ pub const NameRecord = struct {
 // ---------------------------------------------------------------------------
 
 pub const NameStore = struct {
-    names:      std.ArrayList(NameRecord),
+    names:      ArrayList(NameRecord),
     name_index: std.StringHashMap(EntityId),  // value → id (uniqueness check)
     seq:        *IdSequence,
     allocator:  Allocator,
 
     pub fn init(allocator: Allocator, seq: *IdSequence) NameStore {
         return .{
-            .names      = std.ArrayList(NameRecord).init(allocator),
+            .names      = ArrayList(NameRecord).init(allocator),
             .name_index = std.StringHashMap(EntityId).init(allocator),
             .seq        = seq,
             .allocator  = allocator,
