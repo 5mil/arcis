@@ -1,43 +1,48 @@
 const std = @import("std");
+const linux = std.os.linux;
 const gguf = @import("gguf.zig");
 const Model = @import("model.zig").Model;
 const ModelMeta = @import("model.zig").ModelMeta;
 
-/// Memory-mapped GGUF file via libc (Zig 0.16 removed many std.posix wrappers).
+/// Memory-mapped GGUF file (Zig 0.16: use linux syscalls + libc open/close).
 pub const MappedFile = struct {
     data: []align(std.heap.page_size_min) const u8,
-    fd: std.posix.fd_t,
+    fd: i32,
 
     pub fn open(path: []const u8) !MappedFile {
-        // Null-terminate path for libc open
         var path_buf: [std.fs.max_path_bytes]u8 = undefined;
         if (path.len >= path_buf.len) return error.NameTooLong;
         @memcpy(path_buf[0..path.len], path);
         path_buf[path.len] = 0;
         const path_z: [*:0]const u8 = path_buf[0..path.len :0].ptr;
 
-        const fd: std.posix.fd_t = std.c.open(path_z, .{ .ACCMODE = .RDONLY });
+        const fd: i32 = std.c.open(path_z, .{ .ACCMODE = .RDONLY });
         if (fd < 0) return error.FileNotFound;
         errdefer _ = std.c.close(fd);
 
-        var st: std.c.Stat = undefined;
-        if (std.c.fstat(fd, &st) != 0) return error.StatFailed;
+        var st: linux.Stat = undefined;
+        const rc = linux.fstat(@intCast(fd), &st);
+        if (linux.E.init(rc) != .SUCCESS) return error.StatFailed;
         const size: usize = @intCast(st.size);
         if (size == 0) return error.EmptyFile;
 
-        const mapped = try std.posix.mmap(
+        const mapped_ptr = linux.mmap(
             null,
             size,
-            std.posix.PROT.READ,
+            linux.PROT.READ,
             .{ .TYPE = .PRIVATE },
-            fd,
+            @intCast(fd),
             0,
         );
+        if (mapped_ptr == linux.MAP.FAILED) return error.MmapFailed;
+        const mapped: []align(std.heap.page_size_min) const u8 =
+            @as([*]align(std.heap.page_size_min) const u8, @ptrCast(@alignCast(mapped_ptr)))[0..size];
+
         return MappedFile{ .data = mapped, .fd = fd };
     }
 
     pub fn close(self: *MappedFile) void {
-        std.posix.munmap(self.data);
+        _ = linux.munmap(@constCast(@alignCast(self.data.ptr)), self.data.len);
         _ = std.c.close(self.fd);
         self.* = undefined;
     }
