@@ -56,7 +56,7 @@ pub fn main(init: std.process.Init) !void {
     }
 
     var dispatcher = TierDispatcher.init(allocator, &session, tier);
-    var srv = Server.init(allocator, &dispatcher, .{ .port = port });
+    var srv = Server.init(allocator, &dispatcher, .{ .port = port }, io);
 
     std.log.info("Routes: / /health /infer /rag /search", .{});
     try srv.serve();
