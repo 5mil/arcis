@@ -4,6 +4,7 @@
 
 const std = @import("std");
 const Allocator = std.mem.Allocator;
+const ArrayList = std.array_list.Managed;
 
 // ---------------------------------------------------------------------------
 // Trigger kinds
@@ -43,11 +44,11 @@ pub const Trigger = struct {
 // ---------------------------------------------------------------------------
 
 pub const TriggerStore = struct {
-    triggers:  std.ArrayList(Trigger),
+    triggers:  ArrayList(Trigger),
     allocator: Allocator,
 
     pub fn init(allocator: Allocator) TriggerStore {
-        return .{ .triggers = std.ArrayList(Trigger).init(allocator), .allocator = allocator };
+        return .{ .triggers = ArrayList(Trigger).init(allocator), .allocator = allocator };
     }
 
     pub fn deinit(self: *TriggerStore) void {
@@ -59,14 +60,14 @@ pub const TriggerStore = struct {
     }
 
     /// Find all enabled triggers of a given kind.
-    pub fn findByKind(self: TriggerStore, kind: TriggerKind, out: *std.ArrayList(Trigger)) !void {
+    pub fn findByKind(self: TriggerStore, kind: TriggerKind, out: *ArrayList(Trigger)) !void {
         for (self.triggers.items) |t| {
             if (t.kind == kind and t.enabled) try out.append(t);
         }
     }
 
     /// Find all enabled triggers for a named event.
-    pub fn findByEvent(self: TriggerStore, event_name: []const u8, out: *std.ArrayList(Trigger)) !void {
+    pub fn findByEvent(self: TriggerStore, event_name: []const u8, out: *ArrayList(Trigger)) !void {
         for (self.triggers.items) |t| {
             if (t.kind == .event and t.enabled) {
                 if (t.event_name) |en| {
@@ -109,7 +110,7 @@ test "TriggerStore findByEvent" {
     var store = TriggerStore.init(allocator);
     defer store.deinit();
     try store.add(.{ .id = 1, .kind = .event, .workflow_id = 10, .event_name = "doc_ingested" });
-    var out = std.ArrayList(Trigger).init(allocator);
+    var out = ArrayList(Trigger).init(allocator);
     defer out.deinit();
     try store.findByEvent("doc_ingested", &out);
     try std.testing.expectEqual(@as(usize, 1), out.items.len);
