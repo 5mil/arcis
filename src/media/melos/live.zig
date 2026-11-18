@@ -26,7 +26,7 @@ pub fn liveStep(
     allocator: std.mem.Allocator,
     state: *LiveState,
 ) ![]types.MidiNote {
-    var req = generate.GenerateRequest{
+    const req = generate.GenerateRequest{
         .text = state.base_prompt,
         .attributes = state.attributes,
         .bars = 1,
@@ -77,15 +77,3 @@ pub fn modulateFromPrompt(
     _ = allocator;
     return attrs;
 }
-
-// ---------------------------------------------------------------------------
-// API sketch (to be wired in Arcis HTTP router):
-//
-// POST /api/melos/live/step
-//   body: { base_prompt, tempo_bpm, density, current_tick }
-//   → { notes: [MidiNote] }
-//
-// POST /api/melos/live/modulate
-//   body: { prompt }
-//   → { summary, tempo_bpm, density, emotion, ... }
-//
