@@ -3,28 +3,34 @@ const gguf = @import("gguf.zig");
 const Model = @import("model.zig").Model;
 const ModelMeta = @import("model.zig").ModelMeta;
 
+/// Memory-mapped GGUF file (posix only — avoids Zig 0.16 std.Io File migration).
 pub const MappedFile = struct {
     data: []align(std.heap.page_size_min) const u8,
-    handle: std.fs.File,
+    fd: std.posix.fd_t,
 
     pub fn open(path: []const u8) !MappedFile {
-        const file = try std.fs.cwd().openFile(path, .{});
-        errdefer file.close();
-        const stat = try file.stat();
+        const fd = try std.posix.open(path, .{ .ACCMODE = .RDONLY }, 0);
+        errdefer std.posix.close(fd);
+
+        const st = try std.posix.fstat(fd);
+        const size: usize = @intCast(st.size);
+        if (size == 0) return error.EmptyFile;
+
         const mapped = try std.posix.mmap(
             null,
-            stat.size,
+            size,
             std.posix.PROT.READ,
             .{ .TYPE = .PRIVATE },
-            file.handle,
+            fd,
             0,
         );
-        return MappedFile{ .data = mapped, .handle = file };
+        return MappedFile{ .data = mapped, .fd = fd };
     }
 
     pub fn close(self: *MappedFile) void {
         std.posix.munmap(self.data);
-        self.handle.close();
+        std.posix.close(self.fd);
+        self.* = undefined;
     }
 
     pub fn tensorBytes(
@@ -47,9 +53,11 @@ pub fn loadModel(
     allocator: std.mem.Allocator,
     path: []const u8,
 ) !Model {
-    const file = try std.fs.cwd().openFile(path, .{});
-    defer file.close();
-    var parsed = try gguf.parse(allocator, file);
+    // Map first, then parse header from the mapped bytes (no std.fs.File).
+    var mapped = try MappedFile.open(path);
+    errdefer mapped.close();
+
+    var parsed = try gguf.parseFromSlice(allocator, mapped.data);
     errdefer parsed.deinit();
 
     const arch = gguf.metaString(&parsed, "general.architecture") orelse
@@ -70,7 +78,6 @@ pub fn loadModel(
         .tensor_count = @intCast(parsed.tensors.len),
     };
 
-    const mapped = try MappedFile.open(path);
     return Model{
         .gguf      = parsed,
         .mapped    = mapped,
