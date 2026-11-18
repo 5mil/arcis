@@ -1,5 +1,7 @@
 //! main.zig — Arcis engine entry point
 //! Usage: arcis [--tier forma|figura|visio] [--port 8080] [--model path/to/model.gguf]
+//! Compatible with Zig 0.16+ (main receives std.process.Init;
+//! GeneralPurposeAllocator was replaced by DebugAllocator).
 
 const std = @import("std");
 const ArcisSession   = @import("dashboard/arcis_session.zig").ArcisSession;
@@ -9,25 +11,24 @@ const TierDispatcher = @import("api/tier.zig").TierDispatcher;
 
 const HOUSE_GGUF = "models/gguf/DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M.gguf";
 
-pub fn main() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
-    const allocator = gpa.allocator();
+pub fn main(init: std.process.Init) !void {
+    const allocator = init.gpa;
 
-    const args = try std.process.argsAlloc(allocator);
-    defer std.process.argsFree(allocator, args);
+    var args_it = std.process.Args.Iterator.init(init.minimal.args);
 
     var tier: []const u8 = "visio";
     var port: u16 = 9090;
     var model_path: ?[]const u8 = null;
-    var i: usize = 1;
-    while (i < args.len) : (i += 1) {
-        if (std.mem.eql(u8, args[i], "--tier") and i + 1 < args.len) {
-            i += 1; tier = args[i];
-        } else if (std.mem.eql(u8, args[i], "--port") and i + 1 < args.len) {
-            i += 1; port = try std.fmt.parseInt(u16, args[i], 10);
-        } else if (std.mem.eql(u8, args[i], "--model") and i + 1 < args.len) {
-            i += 1; model_path = args[i];
+
+    // Skip argv[0]
+    _ = args_it.next();
+    while (args_it.next()) |arg| {
+        if (std.mem.eql(u8, arg, "--tier")) {
+            if (args_it.next()) |t| tier = t;
+        } else if (std.mem.eql(u8, arg, "--port")) {
+            if (args_it.next()) |p| port = try std.fmt.parseInt(u16, p, 10);
+        } else if (std.mem.eql(u8, arg, "--model")) {
+            if (args_it.next()) |m| model_path = m;
         }
     }
 
