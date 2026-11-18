@@ -3,6 +3,7 @@ const Tokenizer  = @import("tokenizer.zig").Tokenizer;
 const KVCache    = @import("kvcache.zig").KVCache;
 const transformer = @import("transformer.zig");
 const sampler    = @import("sampler.zig");
+const ArrayList = std.array_list.Managed;
 
 /// Session state tracks a single inference context.
 pub const Session = struct {
@@ -12,7 +13,7 @@ pub const Session = struct {
     cfg:         transformer.TransformerConfig,
     sampler_cfg: sampler.SamplerConfig,
     /// Token IDs generated so far in this session.
-    context:     std.ArrayList(u32),
+    context:     ArrayList(u32),
     allocator:   std.mem.Allocator,
     rng:         std.Random.DefaultPrng,
 
@@ -37,7 +38,7 @@ pub const Session = struct {
             .weights     = weights,
             .cfg         = cfg,
             .sampler_cfg = sampler_cfg,
-            .context     = std.ArrayList(u32).init(allocator),
+            .context     = ArrayList(u32).init(allocator),
             .allocator   = allocator,
             .rng         = std.Random.DefaultPrng.init(seed),
         };
@@ -80,7 +81,7 @@ pub const Session = struct {
         }
 
         // Generation loop.
-        var new_ids = std.ArrayList(u32).init(self.allocator);
+        var new_ids = ArrayList(u32).init(self.allocator);
         defer new_ids.deinit();
 
         var pos: usize = prompt_ids.len;
