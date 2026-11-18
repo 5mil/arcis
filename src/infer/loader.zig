@@ -3,14 +3,21 @@ const gguf = @import("gguf.zig");
 const Model = @import("model.zig").Model;
 const ModelMeta = @import("model.zig").ModelMeta;
 
-/// Memory-mapped GGUF file (posix only — avoids Zig 0.16 std.Io File migration).
+/// Memory-mapped GGUF file via libc (Zig 0.16 removed many std.posix wrappers).
 pub const MappedFile = struct {
     data: []align(std.heap.page_size_min) const u8,
     fd: std.posix.fd_t,
 
     pub fn open(path: []const u8) !MappedFile {
-        const fd = try std.posix.open(path, .{ .ACCMODE = .RDONLY }, 0);
-        errdefer std.posix.close(fd);
+        // Null-terminate path for libc open
+        var path_buf: [std.fs.max_path_bytes]u8 = undefined;
+        if (path.len >= path_buf.len) return error.NameTooLong;
+        @memcpy(path_buf[0..path.len], path);
+        path_buf[path.len] = 0;
+
+        const fd: std.posix.fd_t = std.c.open(&path_buf, @as(c_int, 0));
+        if (fd < 0) return error.FileNotFound;
+        errdefer _ = std.c.close(fd);
 
         const st = try std.posix.fstat(fd);
         const size: usize = @intCast(st.size);
@@ -29,7 +36,7 @@ pub const MappedFile = struct {
 
     pub fn close(self: *MappedFile) void {
         std.posix.munmap(self.data);
-        std.posix.close(self.fd);
+        _ = std.c.close(self.fd);
         self.* = undefined;
     }
 
@@ -53,7 +60,6 @@ pub fn loadModel(
     allocator: std.mem.Allocator,
     path: []const u8,
 ) !Model {
-    // Map first, then parse header from the mapped bytes (no std.fs.File).
     var mapped = try MappedFile.open(path);
     errdefer mapped.close();
 
