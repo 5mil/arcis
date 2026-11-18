@@ -1,4 +1,5 @@
 const std = @import("std");
+const ArrayList = std.array_list.Managed;
 const Embedder    = @import("embedder.zig").Embedder;
 const VectorIndex = @import("index.zig").VectorIndex;
 const SearchResult = @import("index.zig").SearchResult;
@@ -17,7 +18,7 @@ pub const Retriever = struct {
     embedder:  *Embedder,
     index:     *VectorIndex,
     /// All chunks stored in the index, indexed by (source_id, chunk_idx).
-    chunk_store: std.ArrayList(Chunk),
+    chunk_store: ArrayList(Chunk),
     allocator:   std.mem.Allocator,
 
     pub fn init(
@@ -28,7 +29,7 @@ pub const Retriever = struct {
         return .{
             .embedder    = embedder,
             .index       = index,
-            .chunk_store = std.ArrayList(Chunk).init(allocator),
+            .chunk_store = ArrayList(Chunk).init(allocator),
             .allocator   = allocator,
         };
     }
