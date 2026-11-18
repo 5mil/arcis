@@ -1,6 +1,7 @@
 const std = @import("std");
 const Embedding = @import("embedder.zig").Embedding;
 const cosineSim = @import("embedder.zig").cosineSimilarity;
+const ArrayList = std.array_list.Managed;
 
 /// A stored vector with its source chunk reference.
 pub const VectorEntry = struct {
@@ -27,14 +28,14 @@ pub const SearchResult = struct {
 /// Flat in-memory vector index with brute-force cosine search.
 /// Suitable for up to ~100k entries; HNSW will be added as a tier-3 upgrade.
 pub const VectorIndex = struct {
-    entries:   std.ArrayList(VectorEntry),
+    entries:   ArrayList(VectorEntry),
     dim:       usize,
     next_id:   u64,
     allocator: std.mem.Allocator,
 
     pub fn init(allocator: std.mem.Allocator, dim: usize) VectorIndex {
         return .{
-            .entries   = std.ArrayList(VectorEntry).init(allocator),
+            .entries   = ArrayList(VectorEntry).init(allocator),
             .dim       = dim,
             .next_id   = 1,
             .allocator = allocator,
