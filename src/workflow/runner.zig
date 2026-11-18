@@ -15,6 +15,12 @@ const Job       = @import("job.zig").Job;
 const JobStatus = @import("job.zig").JobStatus;
 const NodeResult = @import("job.zig").NodeResult;
 
+fn milliTimestamp() i64 {
+    var ts: std.c.timespec = undefined;
+    _ = std.c.clock_gettime(.REALTIME, &ts);
+    return @as(i64, @intCast(ts.sec)) * 1000 + @divTrunc(@as(i64, @intCast(ts.nsec)), 1_000_000);
+}
+
 // ---------------------------------------------------------------------------
 // Runner
 // ---------------------------------------------------------------------------
@@ -72,7 +78,7 @@ pub const Runner = struct {
                 .allocator = self.allocator,
             };
 
-            const start_ms = std.time.milliTimestamp();
+            const start_ms = milliTimestamp();
             var node_status = JobStatus.completed;
             var err_msg: ?[]const u8 = null;
 
@@ -90,7 +96,7 @@ pub const Runner = struct {
                 .status      = node_status,
                 .output      = null,
                 .err_msg     = err_msg,
-                .duration_ms = @intCast(std.time.milliTimestamp() - start_ms),
+                .duration_ms = @intCast(milliTimestamp() - start_ms),
             });
 
             if (node_status == .failed) {
