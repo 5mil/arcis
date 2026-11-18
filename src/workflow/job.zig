@@ -4,6 +4,7 @@
 
 const std = @import("std");
 const Allocator = std.mem.Allocator;
+const ArrayList = std.array_list.Managed;
 const NodeId = @import("graph.zig").NodeId;
 
 // ---------------------------------------------------------------------------
@@ -41,7 +42,7 @@ pub const Job = struct {
     status:       JobStatus,
     started_at:   i64,   // Unix ms
     finished_at:  i64,
-    node_results: std.ArrayList(NodeResult),
+    node_results: ArrayList(NodeResult),
     allocator:    Allocator,
 
     pub fn init(allocator: Allocator, id: u64, workflow_id: u32, trigger_id: ?u32) Job {
@@ -52,7 +53,7 @@ pub const Job = struct {
             .status       = .pending,
             .started_at   = std.time.milliTimestamp(),
             .finished_at  = 0,
-            .node_results = std.ArrayList(NodeResult).init(allocator),
+            .node_results = ArrayList(NodeResult).init(allocator),
             .allocator    = allocator,
         };
     }
@@ -80,12 +81,12 @@ pub const Job = struct {
 // ---------------------------------------------------------------------------
 
 pub const JobStore = struct {
-    jobs:      std.ArrayList(Job),
+    jobs:      ArrayList(Job),
     next_id:   u64,
     allocator: Allocator,
 
     pub fn init(allocator: Allocator) JobStore {
-        return .{ .jobs = std.ArrayList(Job).init(allocator), .next_id = 1, .allocator = allocator };
+        return .{ .jobs = ArrayList(Job).init(allocator), .next_id = 1, .allocator = allocator };
     }
 
     pub fn deinit(self: *JobStore) void {
