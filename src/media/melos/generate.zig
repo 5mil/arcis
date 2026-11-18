@@ -47,7 +47,7 @@ pub fn generateStub(
     const random = rng.random();
 
     for (events, 0..) |*note, i| {
-        const base: u8 = if (attrs.key) |k| k.tonic + 60 else 60;
+        const base: u8 = if (attrs.key) |k| @as(u8, k.tonic) + 60 else 60;
         note.* = .{
             .pitch = base + @as(u8, @intCast(random.intRangeAtMost(u8, 0, 12))),
             .velocity = 80,
@@ -82,16 +82,3 @@ pub fn generateStub(
         .trace = null,
     };
 }
-
-// ---------------------------------------------------------------------------
-// Agent tool integration sketch:
-//
-// fn generateTool(allocator: std.mem.Allocator, input: []const u8) ![]u8 {
-//     // parse input as JSON → GenerateRequest
-//     var req = GenerateRequest{ .text = input };
-//     var result = try generateStub(allocator, req);
-//     defer result.deinit();
-//     // serialize piece to JSON and return
-//     return try std.fmt.allocPrint(allocator, "generated {d} notes", .{result.piece.tracks[0].events.len});
-// }
-//
