@@ -4,6 +4,7 @@
 
 const std = @import("std");
 const Allocator = std.mem.Allocator;
+const ArrayList = std.array_list.Managed;
 const Graph        = @import("graph.zig").Graph;
 const NodeRegistry = @import("node.zig").NodeRegistry;
 const Payload      = @import("node.zig").Payload;
@@ -31,7 +32,7 @@ pub const Workflow = struct {
 // ---------------------------------------------------------------------------
 
 pub const WorkflowSession = struct {
-    workflows:  std.ArrayList(Workflow),
+    workflows:  ArrayList(Workflow),
     triggers:   TriggerStore,
     jobs:       JobStore,
     registry:   NodeRegistry,
@@ -45,7 +46,7 @@ pub const WorkflowSession = struct {
         var jobs     = JobStore.init(allocator);
         var registry = NodeRegistry.init(allocator);
         return .{
-            .workflows  = std.ArrayList(Workflow).init(allocator),
+            .workflows  = ArrayList(Workflow).init(allocator),
             .triggers   = triggers,
             .jobs       = jobs,
             .registry   = registry,
