@@ -4,6 +4,7 @@
 
 const std = @import("std");
 const Allocator = std.mem.Allocator;
+const ArrayList = std.array_list.Managed;
 
 // ---------------------------------------------------------------------------
 // Node and edge types
@@ -42,14 +43,14 @@ pub const Edge = struct {
 // ---------------------------------------------------------------------------
 
 pub const Graph = struct {
-    nodes:     std.ArrayList(Node),
-    edges:     std.ArrayList(Edge),
+    nodes:     ArrayList(Node),
+    edges:     ArrayList(Edge),
     allocator: Allocator,
 
     pub fn init(allocator: Allocator) Graph {
         return .{
-            .nodes     = std.ArrayList(Node).init(allocator),
-            .edges     = std.ArrayList(Edge).init(allocator),
+            .nodes     = ArrayList(Node).init(allocator),
+            .edges     = ArrayList(Edge).init(allocator),
             .allocator = allocator,
         };
     }
@@ -68,7 +69,7 @@ pub const Graph = struct {
     }
 
     /// Return outgoing edges for a node.
-    pub fn outEdges(self: Graph, id: NodeId, out: *std.ArrayList(Edge)) !void {
+    pub fn outEdges(self: Graph, id: NodeId, out: *ArrayList(Edge)) !void {
         for (self.edges.items) |e| {
             if (e.src == id) try out.append(e);
         }
@@ -86,13 +87,13 @@ pub const Graph = struct {
             if (e.dst < n) in_degree[e.dst] += 1;
         }
 
-        var queue = std.ArrayList(NodeId).init(allocator);
+        var queue = ArrayList(NodeId).init(allocator);
         defer queue.deinit();
         for (0..n) |i| {
             if (in_degree[i] == 0) try queue.append(@intCast(i));
         }
 
-        var order = std.ArrayList(NodeId).init(allocator);
+        var order = ArrayList(NodeId).init(allocator);
         errdefer order.deinit();
 
         while (queue.items.len > 0) {
