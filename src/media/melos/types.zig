@@ -16,7 +16,7 @@ pub const MidiNote = struct {
 /// Control change or other non-note event (optional for later).
 pub const MidiEvent = union(enum) {
     note: MidiNote,
-    // Future: cc, pitch_bend, program_change, tempo, time_sig, key_sig, …
+    // Future: cc, pitch_bend, program_change, tempo, time_sig, key_sig
 };
 
 /// Single MIDI track.
@@ -69,7 +69,16 @@ pub const Key = struct {
     mode: Mode,
 };
 
-pub const Mode = enum { major, minor, dorian, mixolydian, /* … */ };
+pub const Mode = enum {
+    major,
+    minor,
+    dorian,
+    mixolydian,
+    phrygian,
+    lydian,
+    locrian,
+    other,
+};
 
 pub const TimeSignature = struct {
     numerator: u8,
@@ -166,12 +175,3 @@ pub const MelosToolRegistry = struct {
         try self.tools.put(tool.name, tool);
     }
 };
-
-// ---------------------------------------------------------------------------
-// Example usage sketch (not compiled)
-// ---------------------------------------------------------------------------
-//
-// var piece = SymbolicPiece{ ... };
-// var mask = TrackMask{ .roles = .{ .melody = true, .bass = true } };
-// const result = try generate_from_attributes(attributes, mask);
-//
