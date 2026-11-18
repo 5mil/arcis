@@ -83,10 +83,35 @@ pub const GGUFFile = struct {
     }
 };
 
+/// Cursor over a const byte slice (avoids std.fs.File / std.Io on Zig 0.16).
+const SliceReader = struct {
+    data: []const u8,
+    pos: usize = 0,
+
+    fn readNoEof(self: *SliceReader, buf: []u8) !void {
+        if (self.pos + buf.len > self.data.len) return error.EndOfStream;
+        @memcpy(buf, self.data[self.pos .. self.pos + buf.len]);
+        self.pos += buf.len;
+    }
+
+    fn readByte(self: *SliceReader) !u8 {
+        if (self.pos >= self.data.len) return error.EndOfStream;
+        const b = self.data[self.pos];
+        self.pos += 1;
+        return b;
+    }
+
+    fn readInt(self: *SliceReader, comptime T: type, endian: std.builtin.Endian) !T {
+        var buf: [@sizeOf(T)]u8 = undefined;
+        try self.readNoEof(&buf);
+        return std.mem.readInt(T, &buf, endian);
+    }
+};
+
 /// Read a length-prefixed GGUF string (u64 len + bytes, no null terminator).
-fn readString(reader: anytype, allocator: std.mem.Allocator) ![]u8 {
+fn readString(reader: *SliceReader, allocator: std.mem.Allocator) ![]u8 {
     const len = try reader.readInt(u64, .little);
-    const buf = try allocator.alloc(u8, len);
+    const buf = try allocator.alloc(u8, @intCast(len));
     errdefer allocator.free(buf);
     try reader.readNoEof(buf);
     return buf;
@@ -94,7 +119,7 @@ fn readString(reader: anytype, allocator: std.mem.Allocator) ![]u8 {
 
 /// Read a single metadata value; returns raw bytes for the value.
 fn readMetaValue(
-    reader: anytype,
+    reader: *SliceReader,
     allocator: std.mem.Allocator,
     vtype: GGUFValueType,
 ) ![]u8 {
@@ -123,8 +148,6 @@ fn readMetaValue(
             return readString(reader, allocator);
         },
         .array => {
-            // Read array type (u32) + count (u64), then skip element bytes.
-            // Store the raw prefix so callers can decode if needed.
             var prefix: [12]u8 = undefined;
             try reader.readNoEof(&prefix);
             const arr_type_raw = std.mem.readInt(u32, prefix[0..4], .little);
@@ -138,7 +161,6 @@ fn readMetaValue(
                 else => 0,
             };
             if (arr_type == .string) {
-                // Variable-length strings: read and discard each one.
                 for (0..arr_count) |_| {
                     const s = try readString(reader, allocator);
                     allocator.free(s);
@@ -159,77 +181,74 @@ fn readMetaValue(
     }
 }
 
-/// Parse a GGUF file from a seekable stream.
-/// Caller owns the returned GGUFFile and must call deinit.
-pub fn parse(
+/// Parse a GGUF header from an already-mapped byte slice.
+pub fn parseFromSlice(
     allocator: std.mem.Allocator,
-    file: std.fs.File,
+    data: []const u8,
 ) !GGUFFile {
-    var br = std.io.bufferedReader(file.reader());
-    const reader = br.reader();
+    var reader = SliceReader{ .data = data };
 
-    // Magic
     const magic = try reader.readInt(u32, .little);
     if (magic != GGUF_MAGIC) return error.InvalidGGUFMagic;
 
-    // Version
     const version = try reader.readInt(u32, .little);
     var version_ok = false;
-    for (SUPPORTED_VERSIONS) |v| { if (v == version) { version_ok = true; break; } }
+    for (SUPPORTED_VERSIONS) |v| {
+        if (v == version) {
+            version_ok = true;
+            break;
+        }
+    }
     if (!version_ok) return error.UnsupportedGGUFVersion;
 
-    // Tensor count + metadata kv count
     const tensor_count = try reader.readInt(u64, .little);
-    const meta_count   = try reader.readInt(u64, .little);
+    const meta_count = try reader.readInt(u64, .little);
 
-    // Metadata
-    const meta = try allocator.alloc(MetaEntry, meta_count);
+    const meta = try allocator.alloc(MetaEntry, @intCast(meta_count));
     errdefer allocator.free(meta);
     var meta_init: usize = 0;
     errdefer for (meta[0..meta_init]) |*e| {
         allocator.free(e.key);
         allocator.free(e.value_bytes);
     };
-    for (meta[0..meta_count]) |*e| {
-        e.key = try readString(reader, allocator);
+    for (meta[0..@intCast(meta_count)]) |*e| {
+        e.key = try readString(&reader, allocator);
         const vtype_raw = try reader.readInt(u32, .little);
         e.value_type = @enumFromInt(vtype_raw);
-        e.value_bytes = try readMetaValue(reader, allocator, e.value_type);
+        e.value_bytes = try readMetaValue(&reader, allocator, e.value_type);
         meta_init += 1;
     }
 
-    // Tensor index
-    const tensors = try allocator.alloc(TensorInfo, tensor_count);
+    const tensors = try allocator.alloc(TensorInfo, @intCast(tensor_count));
     errdefer allocator.free(tensors);
     var tensors_init: usize = 0;
     errdefer for (tensors[0..tensors_init]) |*t| allocator.free(t.name);
-    for (tensors[0..tensor_count]) |*t| {
-        t.name   = try readString(reader, allocator);
+    for (tensors[0..@intCast(tensor_count)]) |*t| {
+        t.name = try readString(&reader, allocator);
         t.n_dims = try reader.readInt(u32, .little);
-        t.dims   = [_]u64{0} ** 4;
+        t.dims = [_]u64{0} ** 4;
         for (0..t.n_dims) |i| t.dims[i] = try reader.readInt(u64, .little);
         const gt_raw = try reader.readInt(u32, .little);
-        t.ggml_type   = @enumFromInt(gt_raw);
+        t.ggml_type = @enumFromInt(gt_raw);
         t.data_offset = try reader.readInt(u64, .little);
         tensors_init += 1;
     }
 
-    // Data section starts at current stream position aligned to 32 bytes.
-    const pos = try file.getPos();
+    // Data section starts at current position aligned to 32 bytes.
+    const pos = reader.pos;
     const alignment: u64 = 32;
     const data_section_offset = (pos + alignment - 1) & ~(alignment - 1);
 
     return GGUFFile{
-        .version             = version,
-        .meta                = meta,
-        .tensors             = tensors,
+        .version = version,
+        .meta = meta,
+        .tensors = tensors,
         .data_section_offset = data_section_offset,
-        .allocator           = allocator,
+        .allocator = allocator,
     };
 }
 
 /// Look up a metadata string value by key.
-/// Returns a slice into the MetaEntry's value_bytes.
 pub fn metaString(gguf: *const GGUFFile, key: []const u8) ?[]const u8 {
     for (gguf.meta) |e| {
         if (std.mem.eql(u8, e.key, key) and e.value_type == .string) {
