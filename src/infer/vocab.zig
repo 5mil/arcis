@@ -1,4 +1,5 @@
 const std = @import("std");
+const ArrayList = std.array_list.Managed;
 
 /// A bidirectional token vocabulary.
 /// Maps token strings to IDs and IDs back to token strings.
@@ -6,7 +7,7 @@ pub const Vocab = struct {
     /// token string → token ID
     token_to_id: std.StringHashMap(u32),
     /// token ID → token string (owned slices)
-    id_to_token: std.ArrayList([]u8),
+    id_to_token: ArrayList([]u8),
     allocator: std.mem.Allocator,
 
     /// Special token IDs. 0 = not set.
@@ -18,7 +19,7 @@ pub const Vocab = struct {
     pub fn init(allocator: std.mem.Allocator) Vocab {
         return .{
             .token_to_id = std.StringHashMap(u32).init(allocator),
-            .id_to_token = std.ArrayList([]u8).init(allocator),
+            .id_to_token = ArrayList([]u8).init(allocator),
             .allocator   = allocator,
             .bos_id      = 0,
             .eos_id      = 0,
