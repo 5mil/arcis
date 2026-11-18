@@ -7,6 +7,12 @@ const Allocator = std.mem.Allocator;
 const ArrayList = std.array_list.Managed;
 const NodeId = @import("graph.zig").NodeId;
 
+fn milliTimestamp() i64 {
+    var ts: std.c.timespec = undefined;
+    _ = std.c.clock_gettime(.REALTIME, &ts);
+    return @as(i64, @intCast(ts.sec)) * 1000 + @divTrunc(@as(i64, @intCast(ts.nsec)), 1_000_000);
+}
+
 // ---------------------------------------------------------------------------
 // Job status
 // ---------------------------------------------------------------------------
@@ -51,7 +57,7 @@ pub const Job = struct {
             .workflow_id  = workflow_id,
             .trigger_id   = trigger_id,
             .status       = .pending,
-            .started_at   = std.time.milliTimestamp(),
+            .started_at   = milliTimestamp(),
             .finished_at  = 0,
             .node_results = ArrayList(NodeResult).init(allocator),
             .allocator    = allocator,
@@ -68,7 +74,7 @@ pub const Job = struct {
 
     pub fn finish(self: *Job, status: JobStatus) void {
         self.status      = status;
-        self.finished_at = std.time.milliTimestamp();
+        self.finished_at = milliTimestamp();
     }
 
     pub fn durationMs(self: Job) i64 {
