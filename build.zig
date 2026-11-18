@@ -53,6 +53,7 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("src/infer/root.zig"),
         .target = target,
         .optimize = optimize,
+        .link_libc = true, // mmap / open via std.c
     });
 
     const rag_mod = b.createModule(.{
@@ -117,6 +118,7 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("src/main.zig"),
         .target = target,
         .optimize = optimize,
+        .link_libc = true, // GGUF loader uses std.c.open/close + mmap
     });
     exe_mod.addImport("common", common_mod);
     exe_mod.addImport("ontology", ontology_mod);
@@ -172,6 +174,7 @@ pub fn build(b: *std.Build) void {
             .root_source_file = b.path(sys.path),
             .target = target,
             .optimize = optimize,
+            .link_libc = true,
         });
 
         // Always available
