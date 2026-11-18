@@ -14,8 +14,9 @@ pub const MappedFile = struct {
         if (path.len >= path_buf.len) return error.NameTooLong;
         @memcpy(path_buf[0..path.len], path);
         path_buf[path.len] = 0;
+        const path_z: [*:0]const u8 = path_buf[0..path.len :0].ptr;
 
-        const fd: std.posix.fd_t = std.c.open(&path_buf, @as(c_int, 0));
+        const fd: std.posix.fd_t = std.c.open(path_z, @as(c_int, 0));
         if (fd < 0) return error.FileNotFound;
         errdefer _ = std.c.close(fd);
 
