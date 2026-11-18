@@ -1,15 +1,14 @@
 const std = @import("std");
-const linux = std.os.linux;
 const gguf = @import("gguf.zig");
 const Model = @import("model.zig").Model;
 const ModelMeta = @import("model.zig").ModelMeta;
 
-/// Memory-mapped GGUF file (Zig 0.16: use linux syscalls + libc open/close).
+/// GGUF file contents held in a heap buffer (Zig 0.16-friendly; no mmap).
 pub const MappedFile = struct {
-    data: []align(std.heap.page_size_min) const u8,
-    fd: i32,
+    data: []u8,
+    allocator: std.mem.Allocator,
 
-    pub fn open(path: []const u8) !MappedFile {
+    pub fn open(allocator: std.mem.Allocator, path: []const u8) !MappedFile {
         var path_buf: [std.fs.max_path_bytes]u8 = undefined;
         if (path.len >= path_buf.len) return error.NameTooLong;
         @memcpy(path_buf[0..path.len], path);
@@ -18,32 +17,32 @@ pub const MappedFile = struct {
 
         const fd: i32 = std.c.open(path_z, .{ .ACCMODE = .RDONLY });
         if (fd < 0) return error.FileNotFound;
-        errdefer _ = std.c.close(fd);
+        defer _ = std.c.close(fd);
 
-        var st: linux.Stat = undefined;
-        const rc = linux.fstat(@intCast(fd), &st);
-        if (linux.E.init(rc) != .SUCCESS) return error.StatFailed;
-        const size: usize = @intCast(st.size);
+        // Size via lseek (avoids fstat which was removed from std.posix)
+        const end = std.c.lseek(fd, 0, std.c.SEEK.END);
+        if (end < 0) return error.SeekFailed;
+        const size: usize = @intCast(end);
         if (size == 0) return error.EmptyFile;
+        if (std.c.lseek(fd, 0, std.c.SEEK.SET) < 0) return error.SeekFailed;
 
-        const mapped_ptr = linux.mmap(
-            null,
-            size,
-            linux.PROT.READ,
-            .{ .TYPE = .PRIVATE },
-            @intCast(fd),
-            0,
-        );
-        if (mapped_ptr == linux.MAP.FAILED) return error.MmapFailed;
-        const mapped: []align(std.heap.page_size_min) const u8 =
-            @as([*]align(std.heap.page_size_min) const u8, @ptrCast(@alignCast(mapped_ptr)))[0..size];
+        const buf = try allocator.alloc(u8, size);
+        errdefer allocator.free(buf);
 
-        return MappedFile{ .data = mapped, .fd = fd };
+        var off: usize = 0;
+        while (off < size) {
+            const n = std.c.read(fd, buf.ptr + off, size - off);
+            if (n < 0) return error.ReadFailed;
+            if (n == 0) break;
+            off += @intCast(n);
+        }
+        if (off != size) return error.UnexpectedEOF;
+
+        return MappedFile{ .data = buf, .allocator = allocator };
     }
 
     pub fn close(self: *MappedFile) void {
-        _ = linux.munmap(@constCast(@alignCast(self.data.ptr)), self.data.len);
-        _ = std.c.close(self.fd);
+        self.allocator.free(self.data);
         self.* = undefined;
     }
 
@@ -67,7 +66,7 @@ pub fn loadModel(
     allocator: std.mem.Allocator,
     path: []const u8,
 ) !Model {
-    var mapped = try MappedFile.open(path);
+    var mapped = try MappedFile.open(allocator, path);
     errdefer mapped.close();
 
     var parsed = try gguf.parseFromSlice(allocator, mapped.data);
