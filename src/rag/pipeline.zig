@@ -1,4 +1,5 @@
 const std = @import("std");
+const ArrayList = std.array_list.Managed;
 const Retriever        = @import("retriever.zig").Retriever;
 const RetrievedPassage = @import("retriever.zig").RetrievedPassage;
 const Session          = @import("../infer/session.zig").Session;
@@ -35,7 +36,7 @@ pub const RAGPipeline = struct {
         user_query: []const u8,
         passages: []const RetrievedPassage,
     ) ![]u8 {
-        var buf = std.ArrayList(u8).init(self.allocator);
+        var buf = ArrayList(u8).init(self.allocator);
         errdefer buf.deinit();
         try buf.appendSlice("### Context\n");
         for (passages, 1..) |p, i| {
