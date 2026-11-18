@@ -5,6 +5,7 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const EntityId = @import("id.zig").EntityId;
+const ArrayList = std.array_list.Managed;
 
 // ---------------------------------------------------------------------------
 // Generic EntityStore(T)
@@ -16,13 +17,13 @@ pub fn EntityStore(comptime T: type) type {
     return struct {
         const Self = @This();
 
-        items:     std.ArrayList(T),
+        items:     ArrayList(T),
         id_index:  std.AutoHashMap(EntityId, usize),  // id → items index
         allocator: Allocator,
 
         pub fn init(allocator: Allocator) Self {
             return .{
-                .items     = std.ArrayList(T).init(allocator),
+                .items     = ArrayList(T).init(allocator),
                 .id_index  = std.AutoHashMap(EntityId, usize).init(allocator),
                 .allocator = allocator,
             };
