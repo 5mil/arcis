@@ -14,6 +14,10 @@ const Tradition  = @import("rules.zig").Tradition;
 const Rank       = @import("rules.zig").Rank;
 const generateName = @import("rules.zig").generateName;
 
+fn milliTimestamp() i64 {
+    return common.milliTimestamp();
+}
+
 // ---------------------------------------------------------------------------
 // NameRecord
 // ---------------------------------------------------------------------------
@@ -101,7 +105,7 @@ pub const NameStore = struct {
             .rank       = rank,
             .status     = .validated,
             .variant_of = variant_of,
-            .created_at = std.time.milliTimestamp(),
+            .created_at = milliTimestamp(),
         });
         try self.name_index.put(value, id);
         return id;
