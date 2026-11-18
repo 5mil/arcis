@@ -1,8 +1,9 @@
 const std = @import("std");
-const Tokenizer   = @import("../infer/tokenizer.zig").Tokenizer;
-const transformer = @import("../infer/transformer.zig");
-const KVCache     = @import("../infer/kvcache.zig").KVCache;
-const attention   = @import("../infer/attention.zig");
+const infer = @import("infer");
+const Tokenizer   = infer.Tokenizer;
+const transformer = infer.transformer;
+const KVCache     = infer.KVCache;
+const attention   = infer.attention;
 
 /// Dense embedding vector.
 pub const Embedding = struct {
