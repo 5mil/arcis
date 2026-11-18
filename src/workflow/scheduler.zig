@@ -4,6 +4,7 @@
 
 const std = @import("std");
 const Allocator = std.mem.Allocator;
+const ArrayList = std.array_list.Managed;
 const TriggerStore = @import("trigger.zig").TriggerStore;
 const TriggerKind  = @import("trigger.zig").TriggerKind;
 const Trigger      = @import("trigger.zig").Trigger;
@@ -25,7 +26,7 @@ pub const PendingDispatch = struct {
 pub const Scheduler = struct {
     triggers:  *TriggerStore,
     jobs:      *JobStore,
-    queue:     std.ArrayList(PendingDispatch),
+    queue:     ArrayList(PendingDispatch),
     allocator: Allocator,
 
     pub fn init(
@@ -36,7 +37,7 @@ pub const Scheduler = struct {
         return .{
             .triggers  = triggers,
             .jobs      = jobs,
-            .queue     = std.ArrayList(PendingDispatch).init(allocator),
+            .queue     = ArrayList(PendingDispatch).init(allocator),
             .allocator = allocator,
         };
     }
@@ -60,7 +61,7 @@ pub const Scheduler = struct {
 
     /// Fire a named event: enqueue all matching event triggers.
     pub fn fireEvent(self: *Scheduler, event_name: []const u8, now_unix_secs: i64) !void {
-        var matches = std.ArrayList(Trigger).init(self.allocator);
+        var matches = ArrayList(Trigger).init(self.allocator);
         defer matches.deinit();
         try self.triggers.findByEvent(event_name, &matches);
         for (matches.items) |t| {
