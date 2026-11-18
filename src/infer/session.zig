@@ -3,7 +3,6 @@ const Tokenizer  = @import("tokenizer.zig").Tokenizer;
 const KVCache    = @import("kvcache.zig").KVCache;
 const transformer = @import("transformer.zig");
 const sampler    = @import("sampler.zig");
-const Config     = @import("../core/config.zig").Config;
 
 /// Session state tracks a single inference context.
 pub const Session = struct {
