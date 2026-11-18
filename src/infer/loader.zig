@@ -16,7 +16,7 @@ pub const MappedFile = struct {
         path_buf[path.len] = 0;
         const path_z: [*:0]const u8 = path_buf[0..path.len :0].ptr;
 
-        const fd: std.posix.fd_t = std.c.open(path_z, @as(c_int, 0));
+        const fd: std.posix.fd_t = std.c.open(path_z, .{ .ACCMODE = .RDONLY });
         if (fd < 0) return error.FileNotFound;
         errdefer _ = std.c.close(fd);
 
