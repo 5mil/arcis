@@ -74,7 +74,8 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
-    // Dashboard module (used by api)
+    // Dashboard + api form a cycle (session holds dispatcher; dispatcher holds session).
+    // Create both first, then cross-link imports.
     const dashboard_mod = b.createModule(.{
         .root_source_file = b.path("src/dashboard/arcis_session.zig"),
         .target = target,
@@ -89,7 +90,7 @@ pub fn build(b: *std.Build) void {
     dashboard_mod.addImport("infer", infer_mod);
 
     const api_mod = b.createModule(.{
-        .root_source_file = b.path("src/api/tier.zig"),
+        .root_source_file = b.path("src/api/root.zig"),
         .target = target,
         .optimize = optimize,
     });
@@ -97,8 +98,11 @@ pub fn build(b: *std.Build) void {
     api_mod.addImport("naming", naming_mod);
     api_mod.addImport("workflow", workflow_mod);
 
+    // Break the cycle: dashboard needs api for TierDispatcher
+    dashboard_mod.addImport("api", api_mod);
+
     // ---------------------------------------------------------------------------
-    // Main executable (root_module style — works on 0.14 and 0.15+)
+    // Main executable
     // ---------------------------------------------------------------------------
     const exe_mod = b.createModule(.{
         .root_source_file = b.path("src/main.zig"),
@@ -106,6 +110,14 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
     exe_mod.addImport("common", common_mod);
+    exe_mod.addImport("ontology", ontology_mod);
+    exe_mod.addImport("library", library_mod);
+    exe_mod.addImport("naming", naming_mod);
+    exe_mod.addImport("search", search_mod);
+    exe_mod.addImport("workflow", workflow_mod);
+    exe_mod.addImport("infer", infer_mod);
+    exe_mod.addImport("dashboard", dashboard_mod);
+    exe_mod.addImport("api", api_mod);
 
     const exe = b.addExecutable(.{
         .name = "arcis",
