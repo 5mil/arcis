@@ -1,4 +1,5 @@
 const std = @import("std");
+const ArrayList = std.array_list.Managed;
 
 /// A single text chunk with source metadata.
 pub const Chunk = struct {
@@ -35,7 +36,7 @@ fn chunkFixed(
     text: []const u8,
     source_id: []const u8,
     cfg: ChunkerConfig,
-    out: *std.ArrayList(Chunk),
+    out: *ArrayList(Chunk),
 ) !void {
     var start: usize = 0;
     var idx: usize = 0;
@@ -62,7 +63,7 @@ fn chunkParagraph(
     allocator: std.mem.Allocator,
     text: []const u8,
     source_id: []const u8,
-    out: *std.ArrayList(Chunk),
+    out: *ArrayList(Chunk),
 ) !void {
     var it = std.mem.splitSequence(u8, text, "\n\n");
     var idx: usize = 0;
@@ -91,8 +92,8 @@ pub fn chunk(
     text: []const u8,
     source_id: []const u8,
     cfg: ChunkerConfig,
-) !std.ArrayList(Chunk) {
-    var out = std.ArrayList(Chunk).init(allocator);
+) !ArrayList(Chunk) {
+    var out = ArrayList(Chunk).init(allocator);
     errdefer {
         for (out.items) |*c| c.deinit();
         out.deinit();
@@ -100,7 +101,7 @@ pub fn chunk(
     switch (cfg.strategy) {
         .fixed_size => try chunkFixed(allocator, text, source_id, cfg, &out),
         .paragraph  => try chunkParagraph(allocator, text, source_id, &out),
-        .sentence   => try chunkFixed(allocator, text, source_id, cfg, &out), // sentence splitter added in next pass
+        .sentence   => try chunkFixed(allocator, text, source_id, cfg, &out),
     }
     return out;
 }
